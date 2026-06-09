@@ -118,7 +118,7 @@ def list_images():
 def serve_image(path: str = Query(...)):
     """Serve local images directly."""
     full_path = os.path.abspath(os.path.join(IMAGES_DIR, path))
-    if not full_path.startswith(os.path.abspath(IMAGES_DIR)):
+    if not str(full_path).lower().startswith(str(os.path.abspath(IMAGES_DIR)).lower()):
          raise HTTPException(status_code=403, detail="Access denied")
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail="Image not found")
