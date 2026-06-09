@@ -1001,7 +1001,8 @@ export default function App() {
             {currentImg && (
               <div style={{
                 width: 300, background: DARK2, borderLeft: `1px solid ${GOLD}22`,
-                padding: 16, display: "flex", flexDirection: "column", gap: 16, overflowY: "auto"
+                padding: 16, display: "flex", flexDirection: "column", gap: 16, overflowY: "auto",
+                flexShrink: 0
               }}>
                 <h3 style={{ fontFamily: "'Cinzel', serif", color: GOLD, fontSize: 14, margin: "0 0 4px" }}>
                   MODUL VERIFIKASI METADATA
