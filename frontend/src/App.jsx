@@ -152,11 +152,88 @@ export default function App() {
   const imgRef = useRef(null);
 
   // --- Real-time Detection States ---
+  const [detectMode, setDetectMode] = useState("upload"); // upload, camera
   const [detectFile, setDetectFile] = useState(null);
   const [detectPreview, setDetectPreview] = useState(null);
   const [detectLoading, setDetectLoading] = useState(false);
   const [detections, setDetections] = useState([]);
   const [selectedDetectIdx, setSelectedDetectIdx] = useState(0);
+  const [cameraActive, setCameraActive] = useState(false);
+  
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const detectIntervalRef = useRef(null);
+
+  // Stop camera stream on unmount or tab change
+  useEffect(() => {
+    if (activeTab !== "detect") {
+      stopCamera();
+    }
+  }, [activeTab]);
+
+  const startCamera = async () => {
+    setDetections([]);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setCameraActive(true);
+      // Run capture check every 750ms to feed YOLOv26 backend
+      detectIntervalRef.current = setInterval(captureFrameAndDetect, 750);
+    } catch (e) {
+      alert("Gagal mengakses kamera: " + e.message);
+      setDetectMode("upload");
+    }
+  };
+
+  const stopCamera = () => {
+    if (detectIntervalRef.current) {
+      clearInterval(detectIntervalRef.current);
+      detectIntervalRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setCameraActive(false);
+  };
+
+  const captureFrameAndDetect = async () => {
+    const video = videoRef.current;
+    if (!video || video.paused || video.ended || !streamRef.current) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const file = new File([blob], "live_frame.jpg", { type: "image/jpeg" });
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const r = await fetch("/api/detect", { method: "POST", body: formData });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d.detections && d.detections.length > 0) {
+          setDetections(d.detections);
+          // Auto-select first kris detected for immediate cultural display
+          setSelectedDetectIdx(0);
+        }
+      } catch (err) {
+        console.error("Live detection failed:", err);
+      }
+    }, "image/jpeg", 0.85);
+  };
+
 
   // --- Initialize & Polling Crawler ---
   useEffect(() => {
@@ -1070,108 +1147,236 @@ export default function App() {
         {activeTab === "detect" && (
           <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24, maxWidth: 1100, margin: "0 auto", width: "100%" }}>
             
+            {/* Mode selection header */}
+            <div style={{
+              background: DARK2, border: `1px solid ${GOLD}33`, borderRadius: 10,
+              padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between"
+            }}>
+              <div>
+                <h4 style={{ margin: 0, color: GOLD, fontSize: 14 }}>Metode Input Pengenalan</h4>
+                <p style={{ margin: 0, fontSize: 11, color: MUTED }}>Pilih antara unggah foto statis atau kamera real-time</p>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => {
+                    stopCamera();
+                    setDetectMode("upload");
+                  }}
+                  style={{
+                    background: detectMode === "upload" ? GOLD : DARK3,
+                    color: detectMode === "upload" ? DARK : CREAM,
+                    border: `1px solid ${GOLD}44`, borderRadius: 6,
+                    padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700
+                  }}
+                >
+                  📁 File Upload
+                </button>
+                <button
+                  onClick={() => {
+                    setDetectMode("camera");
+                    startCamera();
+                  }}
+                  style={{
+                    background: detectMode === "camera" ? GOLD : DARK3,
+                    color: detectMode === "camera" ? DARK : CREAM,
+                    border: `1px solid ${GOLD}44`, borderRadius: 6,
+                    padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700
+                  }}
+                >
+                  📷 Kamera Live
+                </button>
+              </div>
+            </div>
+
             <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 24 }}>
               
               {/* Left Viewport Upload & Results */}
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 
-                {/* Upload dragzone */}
-                <div style={{
-                  background: DARK2, border: `2px dashed ${GOLD}44`,
-                  borderRadius: 12, padding: 24, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 12
-                }}>
-                  <Upload size={32} color={GOLD} />
-                  <div>
-                    <h4 style={{ margin: "0 0 4px", fontSize: 14 }}>Unggah Foto Keris untuk Identifikasi</h4>
-                    <span style={{ fontSize: 11, color: MUTED }}>Mendukung format JPG, JPEG, PNG</span>
-                  </div>
-                  
-                  <input 
-                    type="file" 
-                    id="detect-file-input" 
-                    accept="image/*"
-                    onChange={handleDetectUpload} 
-                    style={{ display: "none" }}
-                  />
-                  
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      onClick={() => document.getElementById("detect-file-input").click()}
-                      style={{
-                        background: DARK3, border: `1px solid ${GOLD}44`, color: CREAM,
-                        borderRadius: 6, padding: "8px 16px", cursor: "pointer", fontSize: 12
-                      }}
-                    >
-                      Pilih File Gambar
-                    </button>
-                    
-                    <button
-                      onClick={runRealTimeDetection}
-                      disabled={!detectFile || detectLoading}
-                      style={{
-                        background: (!detectFile || detectLoading) ? "#333" : GOLD,
-                        color: (!detectFile || detectLoading) ? MUTED : DARK,
-                        border: "none", borderRadius: 6, padding: "8px 20px",
-                        cursor: (!detectFile || detectLoading) ? "default" : "pointer",
-                        fontWeight: 700, fontSize: 12
-                      }}
-                    >
-                      {detectLoading ? "Sedang Menganalisis..." : "Jalankan Deteksi YOLO26"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Upload preview image with bbox drawn */}
-                {detectPreview && (
-                  <div style={{
-                    background: DARK2, border: `1px solid ${GOLD}33`,
-                    borderRadius: 12, padding: 16, display: "flex", justifyContent: "center", alignItems: "center"
-                  }}>
-                    <div style={{ position: "relative", display: "inline-block" }}>
-                      <img 
-                        src={detectPreview} 
-                        style={{ display: "block", maxWidth: "100%", maxHeight: "50vh", borderRadius: 6 }} 
+                {detectMode === "upload" ? (
+                  <>
+                    {/* Upload dragzone */}
+                    <div style={{
+                      background: DARK2, border: `2px dashed ${GOLD}44`,
+                      borderRadius: 12, padding: 24, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 12
+                    }}>
+                      <Upload size={32} color={GOLD} />
+                      <div>
+                        <h4 style={{ margin: "0 0 4px", fontSize: 14 }}>Unggah Foto Keris untuk Identifikasi</h4>
+                        <span style={{ fontSize: 11, color: MUTED }}>Mendukung format JPG, JPEG, PNG</span>
+                      </div>
+                      
+                      <input 
+                        type="file" 
+                        id="detect-file-input" 
+                        accept="image/*"
+                        onChange={handleDetectUpload} 
+                        style={{ display: "none" }}
                       />
                       
-                      {/* Detection boxes overlay */}
-                      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-                        {detections.map((det, idx) => {
-                          const isSel = idx === selectedDetectIdx;
-                          const color = isSel ? GOLD : TEAL;
-                          const { x, y, w, h } = det.bbox;
-                          return (
-                            <g 
-                              key={idx} 
-                              onClick={() => setSelectedDetectIdx(idx)}
-                              style={{ cursor: "pointer" }}
-                            >
-                              <rect
-                                x={`${x * 100}%`}
-                                y={`${y * 100}%`}
-                                width={`${w * 100}%`}
-                                height={`${h * 100}%`}
-                                fill={`${color}15`}
-                                stroke={color}
-                                strokeWidth={isSel ? 3 : 1.5}
-                              />
-                              <foreignObject
-                                x={`${x * 100}%`}
-                                y={`${y * 100 - 20}%`}
-                                width="120"
-                                height="20"
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          onClick={() => document.getElementById("detect-file-input").click()}
+                          style={{
+                            background: DARK3, border: `1px solid ${GOLD}44`, color: CREAM,
+                            borderRadius: 6, padding: "8px 16px", cursor: "pointer", fontSize: 12
+                          }}
+                        >
+                          Pilih File Gambar
+                        </button>
+                        
+                        <button
+                          onClick={runRealTimeDetection}
+                          disabled={!detectFile || detectLoading}
+                          style={{
+                            background: (!detectFile || detectLoading) ? "#333" : GOLD,
+                            color: (!detectFile || detectLoading) ? MUTED : DARK,
+                            border: "none", borderRadius: 6, padding: "8px 20px",
+                            cursor: (!detectFile || detectLoading) ? "default" : "pointer",
+                            fontWeight: 700, fontSize: 12
+                          }}
+                        >
+                          {detectLoading ? "Sedang Menganalisis..." : "Jalankan Deteksi YOLO26"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Upload preview image with bbox drawn */}
+                    {detectPreview && (
+                      <div style={{
+                        background: DARK2, border: `1px solid ${GOLD}33`,
+                        borderRadius: 12, padding: 16, display: "flex", justifyContent: "center", alignItems: "center"
+                      }}>
+                        <div style={{ position: "relative", display: "inline-block" }}>
+                          <img 
+                            src={detectPreview} 
+                            style={{ display: "block", maxWidth: "100%", maxHeight: "50vh", borderRadius: 6 }} 
+                          />
+                          
+                          {/* Detection boxes overlay */}
+                          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+                            {detections.map((det, idx) => {
+                              const isSel = idx === selectedDetectIdx;
+                              const color = isSel ? GOLD : TEAL;
+                              const { x, y, w, h } = det.bbox;
+                              return (
+                                <g 
+                                  key={idx} 
+                                  onClick={() => setSelectedDetectIdx(idx)}
+                                  style={{ cursor: "pointer" }}
+                                >
+                                  <rect
+                                    x={`${x * 100}%`}
+                                    y={`${y * 100}%`}
+                                    width={`${w * 100}%`}
+                                    height={`${h * 100}%`}
+                                    fill={`${color}15`}
+                                    stroke={color}
+                                    strokeWidth={isSel ? 3 : 1.5}
+                                  />
+                                  <foreignObject
+                                    x={`${x * 100}%`}
+                                    y={`${y * 100 - 20}%`}
+                                    width="120"
+                                    height="20"
+                                  >
+                                    <div style={{
+                                      background: color, color: DARK, padding: "2px 6px",
+                                      fontSize: 9, fontWeight: 700, borderRadius: "4px 4px 0 0",
+                                      display: "inline-block"
+                                    }}>
+                                      #{idx + 1} {det.label} ({Math.round(det.confidence * 100)}%)
+                                    </div>
+                                  </foreignObject>
+                                </g>
+                              );
+                            })}
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* Camera Mode Viewport */
+                  <div style={{
+                    background: DARK2, border: `1px solid ${GOLD}33`,
+                    borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 12
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: GOLD, fontWeight: 700 }}>LIVE FEED INFRASTRUKTUR KAMERA</span>
+                      <button
+                        onClick={cameraActive ? stopCamera : startCamera}
+                        style={{
+                          background: cameraActive ? RED : GREEN,
+                          color: cameraActive ? CREAM : DARK,
+                          border: "none", borderRadius: 6, padding: "6px 12px",
+                          fontSize: 11, fontWeight: 700, cursor: "pointer"
+                        }}
+                      >
+                        {cameraActive ? "⏹ Matikan Kamera" : "▶ Aktifkan Kamera"}
+                      </button>
+                    </div>
+
+                    <div style={{ position: "relative", width: "100%", background: "#000", borderRadius: 8, overflow: "hidden", minHeight: 320 }}>
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        style={{ display: "block", width: "100%", height: "auto", minHeight: 320 }}
+                      />
+
+                      {/* Bounding box SVG overlays */}
+                      {cameraActive && (
+                        <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+                          {detections.map((det, idx) => {
+                            const isSel = idx === selectedDetectIdx;
+                            const color = isSel ? GOLD : TEAL;
+                            const { x, y, w, h } = det.bbox;
+                            return (
+                              <g 
+                                key={idx}
+                                onClick={() => setSelectedDetectIdx(idx)}
+                                style={{ cursor: "pointer" }}
                               >
-                                <div style={{
-                                  background: color, color: DARK, padding: "2px 6px",
-                                  fontSize: 9, fontWeight: 700, borderRadius: "4px 4px 0 0",
-                                  display: "inline-block"
-                                }}>
-                                  #{idx + 1} {det.label} ({Math.round(det.confidence * 100)}%)
-                                </div>
-                              </foreignObject>
-                            </g>
-                          );
-                        })}
-                      </svg>
+                                <rect
+                                  x={`${x * 100}%`}
+                                  y={`${y * 100}%`}
+                                  width={`${w * 100}%`}
+                                  height={`${h * 100}%`}
+                                  fill={`${color}10`}
+                                  stroke={color}
+                                  strokeWidth={isSel ? 3 : 1.5}
+                                />
+                                <foreignObject
+                                  x={`${x * 100}%`}
+                                  y={`${y * 100 - 20}%`}
+                                  width="120"
+                                  height="20"
+                                >
+                                  <div style={{
+                                    background: color, color: DARK, padding: "2px 5px",
+                                    fontSize: 8, fontWeight: 700, borderRadius: "4px 4px 0 0",
+                                    display: "inline-block"
+                                  }}>
+                                    #{idx + 1} {det.label} ({Math.round(det.confidence * 100)}%)
+                                  </div>
+                                </foreignObject>
+                              </g>
+                            );
+                          })}
+                        </svg>
+                      )}
+
+                      {!cameraActive && (
+                        <div style={{
+                          position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+                          alignItems: "center", justifyContent: "center", color: MUTED, gap: 10
+                        }}>
+                          <Eye size={36} />
+                          <span style={{ fontSize: 12 }}>Kamera tidak aktif. Klik "Aktifkan Kamera" di atas.</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1278,7 +1483,7 @@ export default function App() {
                     <div>
                       <h4 style={{ margin: "0 0 4px", color: CREAM }}>Hasil Deteksi Budaya</h4>
                       <p style={{ margin: 0, fontSize: 12, lineHeight: 1.6 }}>
-                        Silakan unggah gambar di sebelah kiri dan klik "Jalankan Deteksi YOLO26" untuk mendeteksi keris dan memunculkan metadata nilai filosofinya.
+                        Silakan unggah gambar di sebelah kiri atau aktifkan kamera live untuk mendeteksi keris dan memunculkan metadata nilai filosofinya.
                       </p>
                     </div>
                   </div>
