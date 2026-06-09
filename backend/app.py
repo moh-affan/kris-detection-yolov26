@@ -1,4 +1,9 @@
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 import json
 import csv
 import shutil
@@ -169,7 +174,7 @@ def list_images():
 def serve_image(path: str = Query(...)):
     """Serve local images directly."""
     full_path = os.path.abspath(os.path.join(IMAGES_DIR, path))
-    if not str(full_path).lower().startswith(str(os.path.abspath(IMAGES_DIR)).lower()):
+    if not full_path.lower().startswith(os.path.abspath(IMAGES_DIR).lower()):
          raise HTTPException(status_code=403, detail="Access denied")
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail="Image not found")
@@ -283,6 +288,60 @@ def delete_image_endpoint(filename: str = Form(...), class_folder: str = Form(..
                 ])
                 
     return {"status": "success", "message": f"Image {filename} deleted successfully."}
+
+class KrisMetadataExtraction(BaseModel):
+    dhapur: str
+    pamor: str
+    tangguh: str
+    luk: Optional[int] = None
+
+class GeminiExtractRequest(BaseModel):
+    title: str
+    description: str
+
+@app.post("/api/ai/extract-metadata", response_model=KrisMetadataExtraction)
+def extract_metadata_with_gemini(req: GeminiExtractRequest):
+    # Dapatkan API Key dari environment variable
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="GEMINI_API_KEY tidak dikonfigurasi di server backend. Silakan tentukan API key Anda.")
+        
+    try:
+        from google import genai
+        from google.genai import types
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Library google-genai tidak terinstall.")
+        
+    client = genai.Client(api_key=api_key)
+    
+    prompt = f"""
+    Kamu adalah pakar budaya keris (Tosan Aji). Tugasmu adalah mengekstrak informasi metadata keris dari Judul dan Deskripsi produk di bawah ini.
+    Ekstrak data:
+    1. Dhapur (misal: Sengkelat, Tilam Upih, Brojol, Jalak, dll. Hilangkan kata "Dhapur" jika ada, cukup namanya saja)
+    2. Pamor (misal: Beras Wutah, Ngulit Semangka, Udan Mas, dll. Hilangkan kata "Pamor" jika ada, cukup namanya saja)
+    3. Tangguh (misal: Mataram, Majapahit, Kamardikan, Tuban, dll. Hilangkan kata "Tangguh" jika ada, cukup namanya saja)
+    4. Luk (jumlah lekukan berupa angka integer. Jika lurus, isi 0. Jika tidak diketahui atau tidak disebutkan, isi null/None)
+    
+    Judul: {req.title}
+    Deskripsi: {req.description}
+    """
+    
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=KrisMetadataExtraction,
+                temperature=0.1,
+            ),
+        )
+        # Parse hasil ekstraksi
+        import json
+        extracted_data = json.loads(response.text or "{}")
+        return extracted_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal memproses dengan Gemini: {str(e)}")
 
 @app.post("/api/ai-suggest")
 def ai_suggest(filename: str = Form(...), class_folder: str = Form(...)):
@@ -529,10 +588,10 @@ def segment_click(
         
     # Final fallback default box (no polygon)
     box = {
-        "x": float(max(0.0, x - 0.1)),
-        "y": float(max(0.0, y - 0.2)),
-        "w": float(min(0.2, 1.0 - x)),
-        "h": float(min(0.4, 1.0 - y))
+        "x": max(0.0, x - 0.1),
+        "y": max(0.0, y - 0.2),
+        "w": min(0.2, 1.0 - x),
+        "h": min(0.4, 1.0 - y)
     }
     return {"status": "success", "box": box, "polygon": None}
 
