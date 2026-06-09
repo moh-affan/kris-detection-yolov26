@@ -1,12 +1,9 @@
 FROM python:3.10-slim
 
-# Install system dependencies required for OpenCV, YOLO, and PyTorch
+# Install only minimal system dependencies (glib and ffmpeg)
+# We use apt-get update with retries to handle temporary network issues
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     ffmpeg \
-    libsm6 \
-    libxext6 \
-    libgl1-mesa-glx \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -15,13 +12,12 @@ WORKDIR /app
 # Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip
 
+# Pre-install headless OpenCV so pip install . doesn't pull the GUI version
+RUN pip install --no-cache-dir opencv-python-headless
+
 # Copy python project definition and install dependencies
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir .
-
-# Copy pre-downloaded YOLO and MobileSAM models
-# COPY yolo26n.pt ./
-# COPY mobile_sam.pt ./
 
 # Copy backend files
 COPY backend/ ./backend/
