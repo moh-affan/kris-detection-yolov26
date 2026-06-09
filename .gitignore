@@ -34,8 +34,6 @@ runs/
 .ultralytics/
 
 # Dataset folders (crawled images/annotations)
-dataset_keris/
-dataset_keris_colab/
 *.zip
 *.tar.gz
 
