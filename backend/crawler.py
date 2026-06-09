@@ -262,8 +262,23 @@ def run_crawler_process(max_pages, output_dir):
         add_log("Memulai scraping detail produk dan download gambar...")
         all_metadata = []
         
-        for idx, url in enumerate(url_list):
-            add_log(f"Scraping ({idx+1}/{len(url_list)}): {url.split('/')[-1]}...")
+        checkpoint_path = os.path.join(metadata_dir, 'checkpoint.json')
+        scraped_urls = set()
+        if os.path.exists(checkpoint_path):
+            try:
+                with open(checkpoint_path, 'r', encoding='utf-8') as f:
+                    all_metadata = json.load(f)
+                scraped_urls = {m['url'] for m in all_metadata if 'url' in m}
+                add_log(f"Menemukan checkpoint: {len(scraped_urls)} item sudah di-scrape. Melanjutkan...")
+            except Exception as e:
+                add_log(f"Gagal memuat checkpoint ({e}). Memulai ulang.")
+                all_metadata = []
+
+        todo_urls = [u for u in url_list if u not in scraped_urls]
+        
+        for url in todo_urls:
+            current_count = len(all_metadata)
+            add_log(f"Scraping ({current_count + 1}/{len(url_list)}): {url.split('/')[-1]}...")
             try:
                 resp = requests.get(url, headers=HEADERS, timeout=15)
                 resp.raise_for_status()
@@ -282,7 +297,7 @@ def run_crawler_process(max_pages, output_dir):
                 for img_idx, img_url in enumerate(meta['gambar_urls'][:2]): # download max 2
                     slug = sanitize_filename(meta['judul'][:50])
                     hash_suffix = hashlib.md5(img_url.encode()).hexdigest()[:6]
-                    filename = f"{idx:04d}_{slug}_{img_idx}_{hash_suffix}.jpg"
+                    filename = f"{current_count:04d}_{slug}_{img_idx}_{hash_suffix}.jpg"
                     save_path = os.path.join(label_dir, filename)
 
                     if os.path.exists(save_path):
@@ -300,8 +315,8 @@ def run_crawler_process(max_pages, output_dir):
             all_metadata.append(meta)
 
             # Export intermediate checkpoint
-            if (idx + 1) % 10 == 0 or (idx + 1) == len(url_list):
-                with open(os.path.join(metadata_dir, 'checkpoint.json'), 'w', encoding='utf-8') as f:
+            if len(all_metadata) % 10 == 0 or len(all_metadata) == len(url_list):
+                with open(checkpoint_path, 'w', encoding='utf-8') as f:
                     json.dump(all_metadata, f, ensure_ascii=False, indent=2)
             
             time.sleep(random.uniform(0.5, 1.2))
