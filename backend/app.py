@@ -377,6 +377,36 @@ def segment_click(
     h, w, _ = img.shape
     px = int(x * w)
     py = int(y * h)
+
+    # LEVEL 0: Segment Anything Model (SAM) - highly precise, deep-learning based zero-shot segmentation
+    try:
+        from ultralytics import SAM
+        # Load mobile_sam.pt (only 40MB, lightweight, works great on CPU)
+        sam_model = SAM('mobile_sam.pt')
+        sam_results = sam_model.predict(source=img, points=[[px, py]], labels=[1], verbose=False)
+        if sam_results and sam_results[0].masks is not None and len(sam_results[0].masks.xy) > 0:
+            mask_pts = sam_results[0].masks.xy[0]
+            if len(mask_pts) > 5:
+                # Bounding box coordinates calculation
+                xs = mask_pts[:, 0]
+                ys = mask_pts[:, 1]
+                min_x, max_x = float(np.min(xs)), float(np.max(xs))
+                min_y, max_y = float(np.min(ys)), float(np.max(ys))
+                
+                # Simplify polygon to reduce network payload
+                epsilon = 0.003 * cv2.arcLength(mask_pts.astype(np.int32), True)
+                approx = cv2.approxPolyDP(mask_pts.astype(np.int32), epsilon, True)
+                polygon = [[float(pt[0][0] / w), float(pt[0][1] / h)] for pt in approx]
+                
+                box = {
+                    "x": float(min_x / w),
+                    "y": float(min_y / h),
+                    "w": float((max_x - min_x) / w),
+                    "h": float((max_y - min_y) / h)
+                }
+                return {"status": "success", "box": box, "polygon": polygon, "method": "sam"}
+    except Exception as sam_err:
+        print(f"SAM segmentation failed, falling back to OpenCV contours: {sam_err}")
     
     # 1. Grayscale and Gaussian blur
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
