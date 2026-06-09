@@ -191,6 +191,9 @@ export default function App() {
   const [startPt, setStartPt] = useState(null);
   const [tempBox, setTempBox] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [geminiLoading, setGeminiLoading] = useState(false);
+  const [resizingBox, setResizingBox] = useState(null);
+  const [resizeHandle, setResizeHandle] = useState(null);
   const [imgNaturalSize, setImgNaturalSize] = useState({ w: 1, h: 1 });
   const [filterStatus, setFilterStatus] = useState("all"); // all, pending, done
 
@@ -491,7 +494,55 @@ export default function App() {
     setSelectedBox(null);
   };
 
+  const handleResizeStart = (e, boxId, handleType) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setResizingBox(boxId);
+    setResizeHandle(handleType);
+  };
+
   const onMouseMove = (e) => {
+    if (resizingBox && resizeHandle) {
+      const pt = getCanvasCoord(e);
+      setBoxes(prev => prev.map(box => {
+        if (box.id !== resizingBox) return box;
+        
+        let newX = box.x;
+        let newY = box.y;
+        let newW = box.w;
+        let newH = box.h;
+        
+        const currentRight = box.x + box.w;
+        const currentBottom = box.y + box.h;
+        
+        if (resizeHandle === "tl") {
+          newX = Math.min(pt.x, currentRight - 0.005);
+          newY = Math.min(pt.y, currentBottom - 0.005);
+          newW = currentRight - newX;
+          newH = currentBottom - newY;
+        } else if (resizeHandle === "tr") {
+          newW = Math.max(0.005, pt.x - box.x);
+          newY = Math.min(pt.y, currentBottom - 0.005);
+          newH = currentBottom - newY;
+        } else if (resizeHandle === "bl") {
+          newX = Math.min(pt.x, currentRight - 0.005);
+          newW = currentRight - newX;
+          newH = Math.max(0.005, pt.y - box.y);
+        } else if (resizeHandle === "br") {
+          newW = Math.max(0.005, pt.x - box.x);
+          newH = Math.max(0.005, pt.y - box.y);
+        }
+        
+        return {
+          ...box,
+          x: newX,
+          y: newY,
+          w: newW,
+          h: newH
+        };
+      }));
+      return;
+    }
     if (!drawing || !startPt) return;
     const pt = getCanvasCoord(e);
     setTempBox({
@@ -503,6 +554,15 @@ export default function App() {
   };
 
   const onMouseUp = (e) => {
+    if (resizingBox) {
+      setBoxes(prev => {
+        saveBoxesToStateAndServer(prev);
+        return prev;
+      });
+      setResizingBox(null);
+      setResizeHandle(null);
+      return;
+    }
     if (!drawing || !startPt) return;
     setDrawing(false);
     const pt = getCanvasCoord(e);
@@ -624,6 +684,46 @@ export default function App() {
       await showAlert("Asisten AI Gagal", "Gagal memanggil modul AI offline: " + e.message);
     }
     setAiLoading(false);
+  };
+
+  const handleGeminiAutofill = async () => {
+    if (!currentImg?.crawled_meta) {
+      await showAlert("Autofill Gemini Batal", "Tidak ada data deskripsi dari crawler untuk gambar ini.");
+      return;
+    }
+    setGeminiLoading(true);
+    try {
+      const response = await fetch("/api/ai/extract-metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: currentImg.crawled_meta.judul || currentImg.filename,
+          description: currentImg.crawled_meta.deskripsi || ""
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Gagal mengambil data dari Gemini");
+      }
+      
+      const data = await response.json();
+      
+      // Update form fields
+      setEditingMeta(prev => ({
+        ...prev,
+        dhapur: data.dhapur || prev.dhapur || "",
+        pamor: data.pamor || prev.pamor || "",
+        tangguh: data.tangguh || prev.tangguh || "",
+        luk: data.luk !== null && data.luk !== undefined ? String(data.luk) : (prev.luk || "")
+      }));
+      
+      await showAlert("Autofill Berhasil", "Metadata berhasil diisi otomatis menggunakan Gemini!");
+    } catch (err) {
+      console.error("Gemini Autofill error:", err);
+      await showAlert("Autofill Gagal", err.message);
+    }
+    setGeminiLoading(false);
   };
 
   // --- Real-time Detection Logic ---
@@ -1190,6 +1290,56 @@ export default function App() {
                                 {b.label} {b.confirmed ? "✓" : "?"}
                               </div>
                             </foreignObject>
+
+                            {/* Resize handles - only visible when selected and in select tool mode */}
+                            {isSel && tool === "select" && (
+                              <>
+                                {/* Top-Left */}
+                                <circle
+                                  cx={`${b.x * 100}%`}
+                                  cy={`${b.y * 100}%`}
+                                  r="5"
+                                  fill={GOLD}
+                                  stroke="#000"
+                                  strokeWidth="1.5"
+                                  style={{ cursor: "nwse-resize" }}
+                                  onMouseDown={e => handleResizeStart(e, b.id, "tl")}
+                                />
+                                {/* Top-Right */}
+                                <circle
+                                  cx={`${(b.x + b.w) * 100}%`}
+                                  cy={`${b.y * 100}%`}
+                                  r="5"
+                                  fill={GOLD}
+                                  stroke="#000"
+                                  strokeWidth="1.5"
+                                  style={{ cursor: "nesw-resize" }}
+                                  onMouseDown={e => handleResizeStart(e, b.id, "tr")}
+                                />
+                                {/* Bottom-Left */}
+                                <circle
+                                  cx={`${b.x * 100}%`}
+                                  cy={`${(b.y + b.h) * 100}%`}
+                                  r="5"
+                                  fill={GOLD}
+                                  stroke="#000"
+                                  strokeWidth="1.5"
+                                  style={{ cursor: "nesw-resize" }}
+                                  onMouseDown={e => handleResizeStart(e, b.id, "bl")}
+                                />
+                                {/* Bottom-Right */}
+                                <circle
+                                  cx={`${(b.x + b.w) * 100}%`}
+                                  cy={`${(b.y + b.h) * 100}%`}
+                                  r="5"
+                                  fill={GOLD}
+                                  stroke="#000"
+                                  strokeWidth="1.5"
+                                  style={{ cursor: "nwse-resize" }}
+                                  onMouseDown={e => handleResizeStart(e, b.id, "br")}
+                                />
+                              </>
+                            )}
                           </g>
                         );
                       })}
@@ -1321,6 +1471,31 @@ export default function App() {
                           <span>BOX ANOTASI TERPILIH</span>
                           {selB.confirmed && <span style={{ color: GREEN }}>Confirmed ✓</span>}
                         </div>
+
+                        {/* Gemini Auto-fill Trigger */}
+                        {currentImg.crawled_meta && (
+                          <button
+                            onClick={handleGeminiAutofill}
+                            disabled={geminiLoading}
+                            style={{
+                              background: geminiLoading ? DARK3 : "linear-gradient(135deg, #6200ea 0%, #3700b3 100%)",
+                              color: CREAM,
+                              border: `1px solid ${GOLD}44`,
+                              borderRadius: 6,
+                              padding: "8px 12px",
+                              cursor: geminiLoading ? "default" : "pointer",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: 6,
+                              transition: "all 0.2s ease-in-out"
+                            }}
+                          >
+                            <span>{geminiLoading ? "⏳ Mengekstrak..." : "✨ Auto-fill dengan Gemini"}</span>
+                          </button>
+                        )}
 
                         {/* Dhapur */}
                         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
