@@ -44,7 +44,8 @@ const PAMOR_LIST = [
   "Junjung Derajat","Sumsum Buron","Rojo Gundolo","Lar Gangsir",
   "Tunggak Semi","Udan Mas","Tirta Teja","Wengkon","Kendit",
   "Mrutu Sewu","Kupu Tarung","Tambal","Kelengan","Untu Walang",
-  "Lintang Kemukus","Wahyu Tumurun","Sekar Susun","Manggar"
+  "Lintang Kemukus","Wahyu Tumurun","Sekar Susun","Manggar",
+  "Sodo Lanang","Kulit Semangka"
 ];
 const TANGGUH_LIST = [
   "Madura","Majapahit","Mataram Sultan Agung","Mataram Senopaten",
@@ -120,6 +121,51 @@ function Autocomplete({ value, onChange, options, placeholder }) {
 export default function App() {
   const [activeTab, setActiveTab] = useState("crawl"); // crawl, annotate, detect
 
+  // --- Custom Modal/Alert/Confirm state ---
+  const [modal, setModal] = useState({
+    show: false,
+    type: "alert",
+    title: "",
+    message: "",
+    onConfirm: null,
+    onCancel: null
+  });
+
+  const showAlert = (title, message) => {
+    return new Promise((resolve) => {
+      setModal({
+        show: true,
+        type: "alert",
+        title,
+        message,
+        onConfirm: () => {
+          setModal(m => ({ ...m, show: false }));
+          resolve(true);
+        },
+        onCancel: null
+      });
+    });
+  };
+
+  const showConfirm = (title, message) => {
+    return new Promise((resolve) => {
+      setModal({
+        show: true,
+        type: "confirm",
+        title,
+        message,
+        onConfirm: () => {
+          setModal(m => ({ ...m, show: false }));
+          resolve(true);
+        },
+        onCancel: () => {
+          setModal(m => ({ ...m, show: false }));
+          resolve(false);
+        }
+      });
+    });
+  };
+
   // --- Crawler States ---
   const [crawlerStatus, setCrawlerStatus] = useState({
     status: "idle",
@@ -178,7 +224,7 @@ export default function App() {
       // Run capture check every 750ms to feed YOLOv26 backend
       detectIntervalRef.current = setInterval(captureFrameAndDetect, 750);
     } catch (e) {
-      alert("Gagal mengakses kamera: " + e.message);
+      await showAlert("Akses Kamera Gagal", "Gagal mengakses kamera: " + e.message);
       setDetectMode("upload");
     }
   };
@@ -271,7 +317,7 @@ export default function App() {
       const d = await r.json();
       fetchCrawlerStatus();
     } catch (e) {
-      alert("Gagal memulai crawler: " + e.message);
+      await showAlert("Crawler Gagal", "Gagal memulai crawler: " + e.message);
     }
   };
 
@@ -287,12 +333,32 @@ export default function App() {
 
   // --- Annotator Hooks ---
   const currentImg = images[currentIdx] || null;
+  console.log("Annotator App state:", { currentIdx, imagesCount: images.length, currentImg });
 
   useEffect(() => {
     if (!currentImg) return;
-    setBoxes(currentImg.boxes || []);
-    setSelectedBox(null);
-    setEditingMeta({});
+    const imgBoxes = currentImg.boxes || [];
+    setBoxes(imgBoxes);
+    if (imgBoxes.length > 0) {
+      const firstBox = imgBoxes[0];
+      setSelectedBox(firstBox.id);
+      setEditingMeta({
+        dhapur: firstBox.dhapur || currentImg.dhapur_clue || "",
+        pamor: firstBox.pamor || currentImg.pamor_clue || "",
+        tangguh: firstBox.tangguh || currentImg.tangguh_clue || "",
+        luk: firstBox.luk !== undefined && firstBox.luk !== null && firstBox.luk !== "" ? String(firstBox.luk) : 
+             (currentImg.luk_clue !== undefined && currentImg.luk_clue !== null ? String(currentImg.luk_clue) : ""),
+      });
+    } else {
+      setSelectedBox(null);
+      // Even if there are no boxes, prefill the edit form with image clues so drawing a box instantly gets the correct data
+      setEditingMeta({
+        dhapur: currentImg.dhapur_clue || "",
+        pamor: currentImg.pamor_clue || "",
+        tangguh: currentImg.tangguh_clue || "",
+        luk: currentImg.luk_clue !== undefined && currentImg.luk_clue !== null ? String(currentImg.luk_clue) : "",
+      });
+    }
   }, [currentIdx, images]);
 
   const saveBoxesToStateAndServer = async (newBoxes, markStatus = null) => {
@@ -321,6 +387,34 @@ export default function App() {
     }
   };
 
+  const deleteImage = async () => {
+    if (!currentImg) return;
+    const confirmed = await showConfirm(
+      "Konfirmasi Hapus Gambar",
+      `Apakah Anda yakin ingin menghapus gambar ini (${currentImg.filename}) dari dataset? Tindakan ini bersifat permanen dan akan menghapus file gambar serta anotasi.`
+    );
+    if (!confirmed) return;
+    
+    try {
+      const formData = new FormData();
+      formData.append("filename", currentImg.filename);
+      formData.append("class_folder", currentImg.class_folder);
+      
+      const r = await fetch("/api/images/delete", { method: "POST", body: formData });
+      const d = await r.json();
+      
+      if (d.status === "success") {
+        const nextIdx = currentIdx >= images.length - 1 ? Math.max(0, images.length - 2) : currentIdx;
+        await loadImagesList();
+        setCurrentIdx(nextIdx);
+      } else {
+        await showAlert("Penghapusan Gagal", "Gagal menghapus gambar: " + d.message);
+      }
+    } catch (e) {
+      await showAlert("Error Sistem", "Error menghapus gambar: " + e.message);
+    }
+  };
+
   // SVG drawing logic
   const getCanvasCoord = (e) => {
     const svg = canvasRef.current;
@@ -330,6 +424,62 @@ export default function App() {
       x: (e.clientX - rect.left) / rect.width,
       y: (e.clientY - rect.top) / rect.height,
     };
+  };
+
+  const onSegmentClick = async (e) => {
+    if (!currentImg) return;
+    const pt = getCanvasCoord(e);
+    
+    try {
+      const formData = new FormData();
+      formData.append("filename", currentImg.filename);
+      formData.append("class_folder", currentImg.class_folder);
+      formData.append("x", pt.x);
+      formData.append("y", pt.y);
+      
+      const r = await fetch("/api/segment-click", { method: "POST", body: formData });
+      const d = await r.json();
+      
+      if (d.status === "success" && d.box) {
+        const defaultLabel = currentImg.class_folder.startsWith("keris_") ? currentImg.class_folder : "keris_unknown";
+        
+        let guessedLuk = "";
+        if (defaultLabel.includes("luk_")) {
+          const match = defaultLabel.match(/luk_(\d+)/);
+          if (match) guessedLuk = match[1];
+        } else if (defaultLabel.includes("lurus")) {
+          guessedLuk = "0";
+        }
+        
+        const newBox = {
+          id: Date.now(),
+          x: d.box.x,
+          y: d.box.y,
+          w: d.box.w,
+          h: d.box.h,
+          label: defaultLabel,
+          dhapur: currentImg.dhapur_clue || "",
+          pamor: currentImg.pamor_clue || "",
+          tangguh: currentImg.tangguh_clue || "",
+          luk: currentImg.luk_clue !== undefined && currentImg.luk_clue !== null ? currentImg.luk_clue : 
+               (guessedLuk !== "" ? parseInt(guessedLuk) : ""),
+          confirmed: false,
+          polygon: d.polygon || null,
+        };
+        
+        const updated = [...boxes, newBox];
+        saveBoxesToStateAndServer(updated);
+        setSelectedBox(newBox.id);
+        setEditingMeta({
+          dhapur: "",
+          pamor: "",
+          tangguh: "",
+          luk: String(newBox.luk),
+        });
+      }
+    } catch (err) {
+      console.error("Click segmentation failed:", err);
+    }
   };
 
   const onMouseDown = (e) => {
@@ -379,10 +529,11 @@ export default function App() {
       id: Date.now(),
       ...box,
       label: defaultLabel,
-      dhapur: "",
-      pamor: "",
-      tangguh: "",
-      luk: guessedLuk !== "" ? parseInt(guessedLuk) : "",
+      dhapur: currentImg.dhapur_clue || "",
+      pamor: currentImg.pamor_clue || "",
+      tangguh: currentImg.tangguh_clue || "",
+      luk: currentImg.luk_clue !== undefined && currentImg.luk_clue !== null ? currentImg.luk_clue : 
+           (guessedLuk !== "" ? parseInt(guessedLuk) : ""),
       confirmed: false,
     };
 
@@ -470,7 +621,7 @@ export default function App() {
       }
     } catch (e) {
       console.error(e);
-      alert("Gagal memanggil modul AI offline: " + e.message);
+      await showAlert("Asisten AI Gagal", "Gagal memanggil modul AI offline: " + e.message);
     }
     setAiLoading(false);
   };
@@ -495,7 +646,7 @@ export default function App() {
       setDetections(d.detections || []);
       setSelectedDetectIdx(0);
     } catch (e) {
-      alert("Inference failed: " + e.message);
+      await showAlert("Deteksi Gagal", "Inference failed: " + e.message);
     }
     setDetectLoading(false);
   };
@@ -513,8 +664,9 @@ export default function App() {
 
   return (
     <div style={{
-      minHeight: "100vh", background: DARK, color: CREAM,
+      height: "100vh", background: DARK, color: CREAM,
       fontFamily: "'Inter', sans-serif", display: "flex", flexDirection: "column",
+      overflow: "hidden"
     }}>
       {/* --- Header --- */}
       <header style={{
@@ -576,7 +728,7 @@ export default function App() {
         
         {/* --- TAB 1: CRAWLER & DATASET PREPARATION --- */}
         {activeTab === "crawl" && (
-          <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24, maxWidth: 1200, margin: "0 auto", width: "100%" }}>
+          <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24, maxWidth: 1200, margin: "0 auto", width: "100%", overflowY: "auto", flex: 1 }}>
             
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
               
@@ -774,7 +926,13 @@ export default function App() {
                     return (
                       <div
                         key={img.rel_path}
-                        onClick={() => setCurrentIdx(originalIdx)}
+                        onClick={() => {
+                          console.log("Left panel click - img:", img, "originalIdx:", originalIdx);
+                          if (originalIdx === -1) {
+                            console.error("Mismatched image in left panel!", img);
+                          }
+                          setCurrentIdx(originalIdx);
+                        }}
                         style={{
                           padding: "10px 14px",
                           background: isSelected ? DARK3 : "transparent",
@@ -849,6 +1007,17 @@ export default function App() {
                     >
                       👆 BBox Select
                     </button>
+                    <button
+                      onClick={() => setTool("segment")}
+                      style={{
+                        background: tool === "segment" ? GOLD : DARK3,
+                        color: tool === "segment" ? DARK : CREAM,
+                        border: `1px solid ${GOLD}44`, borderRadius: 6,
+                        padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 700
+                      }}
+                    >
+                      🎯 Click Segment
+                    </button>
                   </div>
 
                   <div style={{ width: 1, height: 20, background: `${GOLD}33` }} />
@@ -873,6 +1042,17 @@ export default function App() {
                   <span style={{ fontSize: 12, color: MUTED }}>
                     Folder: <code style={{ color: GOLD }}>{currentImg.class_folder}</code>
                   </span>
+
+                  <button
+                    onClick={deleteImage}
+                    style={{
+                      background: "rgba(231,76,60,0.15)", border: `1px solid ${RED}33`, color: RED,
+                      borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: 12,
+                      fontWeight: 700
+                    }}
+                  >
+                    🗑️ Hapus Gambar
+                  </button>
 
                   <button
                     onClick={() => {
@@ -906,25 +1086,46 @@ export default function App() {
                   flex: 1, display: "flex", justifyContent: "center", alignItems: "center",
                   padding: 24, overflow: "auto"
                 }}>
-                  <div style={{ position: "relative", display: "inline-block", boxShadow: "0 0 32px #000000dd" }}>
+                  <div style={{
+                    position: "relative",
+                    display: "inline-block",
+                    boxShadow: "0 0 32px #000000dd",
+                    maxWidth: "65vw",
+                    maxHeight: "65vh"
+                  }}>
                     
                     <img
                       ref={imgRef}
                       src={`/api/images/serve?path=${encodeURIComponent(currentImg.rel_path)}`}
-                      onLoad={e => setImgNaturalSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
-                      style={{ display: "block", maxWidth: "65vw", maxHeight: "65vh", userSelect: "none", pointerEvents: "none" }}
+                      onLoad={e => {
+                        console.log("Image loaded successfully in canvas:", currentImg.rel_path, e.target.naturalWidth, e.target.naturalHeight);
+                        setImgNaturalSize({ w: e.target.naturalWidth, h: e.target.naturalHeight });
+                      }}
+                      onError={e => {
+                        console.error("Image failed to load in canvas:", currentImg.rel_path);
+                      }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        height: "100%",
+                        maxWidth: "65vw",
+                        maxHeight: "65vh",
+                        objectFit: "contain",
+                        userSelect: "none",
+                        pointerEvents: "none"
+                      }}
                     />
                     
                     <svg
                       ref={canvasRef}
                       style={{
                         position: "absolute", inset: 0, width: "100%", height: "100%",
-                        cursor: tool === "draw" ? "crosshair" : "default"
+                        cursor: tool === "draw" ? "crosshair" : (tool === "segment" ? "pointer" : "default")
                       }}
                       onMouseDown={onMouseDown}
                       onMouseMove={onMouseMove}
                       onMouseUp={onMouseUp}
-                      onClick={tool === "select" ? () => setSelectedBox(null) : undefined}
+                      onClick={tool === "select" ? () => setSelectedBox(null) : (tool === "segment" ? onSegmentClick : undefined)}
                     >
                       {/* Bounding boxes */}
                       {boxes.map(b => {
@@ -949,6 +1150,22 @@ export default function App() {
                             }}
                             style={{ cursor: tool === "select" ? "pointer" : "default" }}
                           >
+                            {/* Semi-transparent segmentation overlay mask */}
+                            {b.polygon && (
+                              <svg
+                                viewBox="0 0 1 1"
+                                preserveAspectRatio="none"
+                                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}
+                              >
+                                <polygon
+                                  points={b.polygon.map(p => `${p[0]},${p[1]}`).join(" ")}
+                                  fill={color + "44"}
+                                  stroke={color}
+                                  strokeWidth="0.003"
+                                />
+                              </svg>
+                            )}
+
                             <rect
                               x={`${b.x * 100}%`} y={`${b.y * 100}%`}
                               width={`${b.w * 100}%`} height={`${b.h * 100}%`}
@@ -1010,6 +1227,87 @@ export default function App() {
                 <div style={{ fontSize: 11, color: MUTED, wordBreak: "break-all" }}>
                   File: {currentImg.filename}
                 </div>
+
+                {/* Crawler Reference Card */}
+                {currentImg.crawled_meta ? (
+                  <div style={{
+                    background: "rgba(201, 168, 76, 0.05)",
+                    border: `1px solid ${GOLD}44`,
+                    borderRadius: 8,
+                    padding: 12,
+                    fontSize: 12,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8
+                  }}>
+                    <div style={{ color: GOLD, fontWeight: 700, fontSize: 10, letterSpacing: 0.5 }}>
+                      🔍 REFERENSI CRAWLER
+                    </div>
+                    <div>
+                      <span style={{ color: MUTED, fontSize: 10 }}>Judul Produk:</span>
+                      <div style={{ color: CREAM, fontWeight: 600, marginTop: 2 }}>{currentImg.crawled_meta.judul}</div>
+                    </div>
+                    {currentImg.crawled_meta.kode_produk && (
+                      <div>
+                        <span style={{ color: MUTED, fontSize: 10 }}>Kode Produk:</span>
+                        <span style={{ color: CREAM, marginLeft: 6 }}>{currentImg.crawled_meta.kode_produk}</span>
+                      </div>
+                    )}
+                    {currentImg.crawled_meta.harga && (
+                      <div>
+                        <span style={{ color: MUTED, fontSize: 10 }}>Harga:</span>
+                        <span style={{ color: GOLD, marginLeft: 6, fontWeight: 600 }}>{currentImg.crawled_meta.harga}</span>
+                      </div>
+                    )}
+                    {currentImg.crawled_meta.url && (
+                      <div>
+                        <span style={{ color: MUTED, fontSize: 10 }}>URL Asli:</span>
+                        <a 
+                          href={currentImg.crawled_meta.url} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          style={{ color: TEAL, textDecoration: "none", marginLeft: 6, wordBreak: "break-all" }}
+                        >
+                          Buka Link 🔗
+                        </a>
+                      </div>
+                    )}
+                    {currentImg.crawled_meta.deskripsi && (
+                      <div>
+                        <span style={{ color: MUTED, fontSize: 10 }}>Deskripsi:</span>
+                        <div style={{
+                          color: CREAM, fontSize: 11, background: "rgba(0,0,0,0.2)",
+                          padding: 6, borderRadius: 4, marginTop: 4, maxHeight: 80,
+                          overflowY: "auto", whiteSpace: "pre-wrap"
+                        }}>
+                          {currentImg.crawled_meta.deskripsi}
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ width: "100%", height: 1, background: `${GOLD}22`, margin: "4px 0" }} />
+                    <div style={{ fontSize: 10, color: MUTED }}>
+                      <b>Nilai Ekstraksi Web:</b>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                        <span style={{ background: DARK3, padding: "2px 6px", borderRadius: 4 }}>Dhapur: {currentImg.crawled_meta.dhapur || "-"}</span>
+                        <span style={{ background: DARK3, padding: "2px 6px", borderRadius: 4 }}>Pamor: {currentImg.crawled_meta.pamor || "-"}</span>
+                        <span style={{ background: DARK3, padding: "2px 6px", borderRadius: 4 }}>Tangguh: {currentImg.crawled_meta.tangguh || "-"}</span>
+                        <span style={{ background: DARK3, padding: "2px 6px", borderRadius: 4 }}>Luk: {currentImg.crawled_meta.luk !== null ? currentImg.crawled_meta.luk : "-"}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    background: "rgba(201, 168, 76, 0.02)",
+                    border: `1px dashed ${GOLD}22`,
+                    borderRadius: 8,
+                    padding: 12,
+                    fontSize: 11,
+                    color: MUTED,
+                    textAlign: "center"
+                  }}>
+                    Tidak ada metadata crawler langsung untuk file ini.
+                  </div>
+                )}
 
                 <div style={{ width: "100%", height: 1, background: `${GOLD}22` }} />
 
@@ -1146,7 +1444,7 @@ export default function App() {
 
         {/* --- TAB 3: REAL-TIME DETECTION (INFERENCE) --- */}
         {activeTab === "detect" && (
-          <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24, maxWidth: 1100, margin: "0 auto", width: "100%" }}>
+          <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24, maxWidth: 1100, margin: "0 auto", width: "100%", overflowY: "auto", flex: 1 }}>
             
             {/* Mode selection header */}
             <div style={{
@@ -1497,6 +1795,123 @@ export default function App() {
         )}
 
       </main>
+
+      {/* Style for Modal Transition */}
+      <style>{`
+        @keyframes modalFadeIn {
+          from { opacity: 0; transform: scale(0.95) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
+
+      {/* --- Aesthetic Custom Alert/Confirm Modal --- */}
+      {modal.show && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0, 0, 0, 0.75)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 9999, transition: "all 0.3s ease"
+        }}>
+          <div style={{
+            background: DARK2, border: `2px solid ${GOLD}`,
+            borderRadius: 12, width: "90%", maxWidth: 450,
+            boxShadow: `0 8px 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(201, 168, 76, 0.15)`,
+            overflow: "hidden", display: "flex", flexDirection: "column",
+            animation: "modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)"
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              background: `linear-gradient(135deg, ${DARK3}, ${DARK2})`,
+              padding: "16px 20px", borderBottom: `1px solid ${GOLD}44`,
+              display: "flex", alignItems: "center", gap: 12
+            }}>
+              <span style={{ fontSize: 20 }}>{modal.type === "confirm" ? "❓" : "⚠️"}</span>
+              <h3 style={{
+                fontFamily: "'Cinzel', serif", color: GOLD, margin: 0,
+                fontSize: 16, fontWeight: 700, letterSpacing: 1
+              }}>
+                {modal.title}
+              </h3>
+            </div>
+            
+            {/* Modal Body */}
+            <div style={{ padding: "20px", fontSize: 13, color: CREAM, lineHeight: 1.6 }}>
+              {modal.message}
+            </div>
+            
+            {/* Modal Footer */}
+            <div style={{
+              background: DARK3, padding: "12px 20px",
+              display: "flex", justifyContent: "flex-end", gap: 10,
+              borderTop: `1px solid ${GOLD}22`
+            }}>
+              {modal.type === "confirm" ? (
+                <>
+                  <button
+                    onClick={modal.onCancel}
+                    style={{
+                      background: "transparent", border: `1px solid ${GOLD}44`,
+                      color: GOLD, borderRadius: 6, padding: "8px 16px",
+                      fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      transition: "all 0.2s"
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = `${GOLD}11`;
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    onClick={modal.onConfirm}
+                    style={{
+                      background: modal.title.toLowerCase().includes("hapus") || modal.message.toLowerCase().includes("hapus") ? RED : GOLD,
+                      border: "none",
+                      color: modal.title.toLowerCase().includes("hapus") || modal.message.toLowerCase().includes("hapus") ? "#fff" : DARK,
+                      borderRadius: 6, padding: "8px 16px",
+                      fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      boxShadow: modal.title.toLowerCase().includes("hapus") || modal.message.toLowerCase().includes("hapus")
+                        ? "0 2px 8px rgba(231, 76, 60, 0.4)"
+                        : `0 2px 8px rgba(201, 168, 76, 0.4)`,
+                      transition: "all 0.2s"
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.filter = "brightness(1.1)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.filter = "none";
+                    }}
+                  >
+                    {modal.title.toLowerCase().includes("hapus") || modal.message.toLowerCase().includes("hapus") ? "Hapus" : "Ya"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={modal.onConfirm}
+                  style={{
+                    background: GOLD, border: "none",
+                    color: DARK, borderRadius: 6, padding: "8px 20px",
+                    fontSize: 12, fontWeight: 700, cursor: "pointer",
+                    transition: "all 0.2s"
+                    // boxShadow: `0 2px 8px ${GOLD}66`
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.filter = "brightness(1.1)";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.filter = "none";
+                  }}
+                >
+                  OK
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
