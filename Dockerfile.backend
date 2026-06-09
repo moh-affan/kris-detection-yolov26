@@ -20,8 +20,8 @@ COPY pyproject.toml ./
 RUN pip install --no-cache-dir .
 
 # Copy pre-downloaded YOLO and MobileSAM models
-COPY yolo26n.pt ./
-COPY mobile_sam.pt ./
+# COPY yolo26n.pt ./
+# COPY mobile_sam.pt ./
 
 # Copy backend files
 COPY backend/ ./backend/
