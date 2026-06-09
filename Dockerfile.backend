@@ -1,7 +1,6 @@
 FROM python:3.10-slim
 
 # Install only minimal system dependencies (glib and ffmpeg)
-# We use apt-get update with retries to handle temporary network issues
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libglib2.0-0 \
@@ -9,15 +8,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Upgrade pip
-RUN pip install --no-cache-dir --upgrade pip
+# Copy the uv binary from the official astral-sh image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Pre-install headless OpenCV so pip install . doesn't pull the GUI version
-RUN pip install --no-cache-dir opencv-python-headless
+# Copy python project definition and lock file
+COPY pyproject.toml uv.lock ./
 
-# Copy python project definition and install dependencies
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir .
+# Sync dependencies (creates the virtual environment .venv and installs packages)
+RUN uv sync --frozen
+
+# Replace opencv-python with opencv-python-headless inside the virtual environment
+RUN uv pip install opencv-python-headless
 
 # Copy backend files
 COPY backend/ ./backend/
@@ -25,5 +26,5 @@ COPY backend/ ./backend/
 # Expose port 8000 (internally)
 EXPOSE 8000
 
-# Run the backend FastAPI app
-CMD ["python", "backend/app.py"]
+# Run the backend FastAPI app inside the virtual environment using uv run
+CMD ["uv", "run", "python", "backend/app.py"]
