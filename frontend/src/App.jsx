@@ -164,13 +164,6 @@ export default function App() {
   const streamRef = useRef(null);
   const detectIntervalRef = useRef(null);
 
-  // Stop camera stream on unmount or tab change
-  useEffect(() => {
-    if (activeTab !== "detect") {
-      stopCamera();
-    }
-  }, [activeTab]);
-
   const startCamera = async () => {
     setDetections([]);
     try {
@@ -233,6 +226,13 @@ export default function App() {
       }
     }, "image/jpeg", 0.85);
   };
+
+  // Stop camera stream on unmount or tab change
+  useEffect(() => {
+    if (activeTab !== "detect") {
+      stopCamera();
+    }
+  }, [activeTab]);
 
 
   // --- Initialize & Polling Crawler ---
