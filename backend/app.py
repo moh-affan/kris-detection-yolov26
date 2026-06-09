@@ -353,6 +353,19 @@ def segment_click(
     import cv2
     import numpy as np
     
+    def smooth_contour(cnt, window_size=9):
+        if len(cnt) < window_size:
+            return cnt
+        smoothed = cnt.copy()
+        half = window_size // 2
+        n = len(cnt)
+        for i in range(n):
+            pts = []
+            for j in range(-half, half + 1):
+                pts.append(cnt[(i + j) % n][0])
+            smoothed[i][0] = np.mean(pts, axis=0)
+        return smoothed
+
     full_path = os.path.join(IMAGES_DIR, class_folder, filename)
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail="Image not found")
@@ -372,10 +385,12 @@ def segment_click(
     target_contour = None
     min_area = 200
     
-    # LEVEL A: Otsu's Global Thresholding (excellent for high contrast solid shapes on uniform backgrounds)
+    # LEVEL A: Otsu's Global Thresholding (MORPH_CLOSE followed by MORPH_OPEN to smooth and clean spurs)
     _, thresh_otsu = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    kernel_otsu = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
-    closed_otsu = cv2.morphologyEx(thresh_otsu, cv2.MORPH_CLOSE, kernel_otsu)
+    kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (11, 11))
+    kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    closed_otsu = cv2.morphologyEx(thresh_otsu, cv2.MORPH_CLOSE, kernel_close)
+    closed_otsu = cv2.morphologyEx(closed_otsu, cv2.MORPH_OPEN, kernel_open)
     contours, _ = cv2.findContours(closed_otsu, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     for cnt in contours:
@@ -393,8 +408,10 @@ def segment_click(
             blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
             cv2.THRESH_BINARY_INV, 101, 2
         )
-        kernel_adapt = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
-        closed_adapt = cv2.morphologyEx(thresh_adapt, cv2.MORPH_CLOSE, kernel_adapt)
+        kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+        closed_adapt = cv2.morphologyEx(thresh_adapt, cv2.MORPH_CLOSE, kernel_close)
+        closed_adapt = cv2.morphologyEx(closed_adapt, cv2.MORPH_OPEN, kernel_open)
         contours, _ = cv2.findContours(closed_adapt, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         for cnt in contours:
@@ -406,11 +423,13 @@ def segment_click(
                 target_contour = cnt
                 break
                 
-    # LEVEL C: Canny Edges with Large Morphological Closing (to connect long curves like luk wave contours)
+    # LEVEL C: Canny Edges with Large Morphological Closing and Opening (to connect and smooth shapes)
     if target_contour is None:
         edges = cv2.Canny(blurred, 20, 100)
-        kernel_canny = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
-        closed_canny = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel_canny)
+        kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
+        closed_canny = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel_close)
+        closed_canny = cv2.morphologyEx(closed_canny, cv2.MORPH_OPEN, kernel_open)
         contours, _ = cv2.findContours(closed_canny, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         for cnt in contours:
@@ -428,10 +447,8 @@ def segment_click(
         mask = np.zeros((h + 2, w + 2), np.uint8)
         img_temp = img.copy()
         try:
-            # Increased tolerance from 15 to 35 to span gradients/reflections on metallic blade
             cv2.floodFill(img_temp, mask, (px, py), (255, 0, 0), (35, 35, 35), (35, 35, 35), 4 | (255 << 8) | cv2.FLOODFILL_MASK_ONLY)
             
-            # Find coordinates from mask
             pts = np.argwhere(mask == 255)
             if len(pts) > 0:
                 min_y, min_x = pts.min(axis=0)
@@ -443,13 +460,12 @@ def segment_click(
                 rh = int(max_y - min_y)
                 
                 if rw > 10 and rh > 10:
-                    # Find contour from mask to draw overlay polygon
                     sub_contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     if len(sub_contours) > 0:
                         cnt = max(sub_contours, key=cv2.contourArea)
-                        epsilon = 0.002 * cv2.arcLength(cnt, True)
-                        approx = cv2.approxPolyDP(cnt, epsilon, True)
-                        # Offset by -1 because mask is padded
+                        smoothed_cnt = smooth_contour(cnt, window_size=9)
+                        epsilon = 0.005 * cv2.arcLength(smoothed_cnt, True)
+                        approx = cv2.approxPolyDP(smoothed_cnt, epsilon, True)
                         polygon = [[float((pt[0][0] - 1) / w), float((pt[0][1] - 1) / h)] for pt in approx]
                         
                     box = {
@@ -465,9 +481,12 @@ def segment_click(
     if target_contour is not None:
         rx, ry, rw, rh = cv2.boundingRect(target_contour)
         
-        # Simplify contour to reduce network payload
-        epsilon = 0.002 * cv2.arcLength(target_contour, True)
-        approx = cv2.approxPolyDP(target_contour, epsilon, True)
+        # 1. Smooth 1D contour coordinates to suppress jagged spurs/branches
+        smoothed_cnt = smooth_contour(target_contour, window_size=11)
+        
+        # 2. Simplify contour with slightly increased tolerance (0.005) for smooth curves
+        epsilon = 0.005 * cv2.arcLength(smoothed_cnt, True)
+        approx = cv2.approxPolyDP(smoothed_cnt, epsilon, True)
         polygon = [[float(pt[0][0] / w), float(pt[0][1] / h)] for pt in approx]
         
         box = {
