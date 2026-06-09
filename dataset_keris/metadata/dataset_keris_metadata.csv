@@ -1,5 +1,15 @@
 ﻿filename,class_folder,box_id,x_center,y_center,width,height,label,dhapur,pamor,tangguh,luk,confirmed
+0073_Keris_Condong_Campur_Pamor_Pedaringan_Kebak_0_533b56.jpg,keris_condong_campur_,0,0.3841,0.5482,0.2768,0.7786,keris_lurus,Condong Campur,Pedaringan Kebak,Tidak diketahui,0,yes
+0073_Keris_Condong_Campur_Pamor_Pedaringan_Kebak_0_533b56.jpg,keris_condong_campur_,1,0.6348,0.4966,0.1855,0.8408,keris_condong_campur_,Condong Campur,Pedaringan Kebak,,,no
 0059_Keris_Carang_Soka_Pamor_Lintang_Kemukus_0_77bdfc.jpg,keris_carang_soka_,0,0.3799,0.4863,0.3398,0.8457,keris_luk_9,Carang Soka,Lintang Kemukus,,9,yes
 0059_Keris_Carang_Soka_Pamor_Lintang_Kemukus_0_77bdfc.jpg,keris_carang_soka_,1,0.6514,0.5132,0.1914,0.8330,keris_carang_soka_,Carang Soka,Lintang Kemukus,,,no
-0072_Keris_Carubuk_Pamor_Wahyu_Tumurun_0_705c2d.jpg,keris_carubuk_,0,0.3857,0.5366,0.2910,0.7861,keris_carubuk_,Carubuk,Wahyu Tumurun,,,no
+0072_Keris_Carubuk_Pamor_Wahyu_Tumurun_0_705c2d.jpg,keris_carubuk_,0,0.3857,0.5366,0.2910,0.7861,keris_luk_7,Carubuk,Wahyu Tumurun,,7,yes
 0072_Keris_Carubuk_Pamor_Wahyu_Tumurun_0_705c2d.jpg,keris_carubuk_,1,0.6582,0.4948,0.1856,0.8699,keris_luk_7,Carubuk,Wahyu Tumurun,tidak diketahui,7,yes
+0198_Keris_Pasopati_Damar_Murub_Urubing_Dilah_0_26fa6a.jpg,keris_damar_murub_,0,0.3874,0.5202,0.2806,0.7877,keris_lurus,Pasopati,Damar Murub,Tidak diketahui,0,yes
+0198_Keris_Pasopati_Damar_Murub_Urubing_Dilah_0_26fa6a.jpg,keris_damar_murub_,1,0.6548,0.4839,0.1748,0.8662,keris_damar_murub_,Damar Murub,,,,no
+0113_Keris_Karno_Tinanding_Unik_Antik_0_bfa897.jpg,keris_karno_tinanding_,0,0.3934,0.5357,0.2605,0.7372,keris_lurus,Karno Tinanding,tidak diketahui,tidak diketahui,0,yes
+0113_Keris_Karno_Tinanding_Unik_Antik_0_bfa897.jpg,keris_karno_tinanding_,1,0.6182,0.4985,0.1191,0.8369,keris_karno_tinanding_,Karno Tinanding,,,,no
+0117_Keris_Kebo_Lajer_Lawe_Saukel_Kulit_Semangka_0_2622dc.jpg,keris_kebo_lajer_,0,0.3926,0.5269,0.2735,0.7847,keris_lurus,Kebo Lajer,Ngulit Semangka,tidak diketahui,0,yes
+0117_Keris_Kebo_Lajer_Lawe_Saukel_Kulit_Semangka_0_2622dc.jpg,keris_kebo_lajer_,1,0.6396,0.4926,0.1699,0.8336,keris_kebo_lajer_,Kebo Lajer,Kulit Semangka,,,no
+0118_Keris_Kebo_Lajer_Pamor_Batu_Lapak_Ngulit_Semangka_0_5ec158.jpg,keris_kebo_lajer_,0,0.4082,0.5132,0.2988,0.8213,keris_lurus,Kebo Lajer,Batu Lapak Ngulit Semangka,tidak diketahui,0,yes
+0118_Keris_Kebo_Lajer_Pamor_Batu_Lapak_Ngulit_Semangka_0_5ec158.jpg,keris_kebo_lajer_,1,0.6479,0.4956,0.1748,0.8701,keris_kebo_lajer_,Kebo Lajer,Ngulit Semangka,,,no
