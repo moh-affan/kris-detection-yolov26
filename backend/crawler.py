@@ -196,7 +196,7 @@ def get_product_urls(page_url):
         soup = BeautifulSoup(resp.text, 'html.parser')
         urls = set()
         for a in soup.find_all('a', href=True):
-            href = str(a['href']) if 'href' in a else ""
+            href = a.get('href', '')
             if href.startswith(BASE_URL + '/') and '/category/' not in href and '/katalog/' not in href and '/page/' not in href and href != BASE_URL + '/' and len(href) > len(BASE_URL) + 5:
                 excluded = ['/cart', '/daftar', '/login', '/kontak', '/tosan-aji-group', '/filosofi', '/kawruh']
                 if not any(ex in href for ex in excluded):
