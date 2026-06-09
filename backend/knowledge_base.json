@@ -1,0 +1,196 @@
+{
+  "dapur": {
+    "brojol": {
+      "nama": "Brojol",
+      "luk": 0,
+      "deskripsi": "Bilah lurus tanpa luk, paling sederhana dan paling tua.",
+      "tangguh": ["Majapahit", "Pajajaran", "Madura"],
+      "filosofi": "Melambangkan kejujuran, kepolosan, dan kesederhanaan jiwa.",
+      "kegunaan_historis": "Pusaka para petani dan rakyat biasa."
+    },
+    "tilam_upih": {
+      "nama": "Tilam Upih",
+      "luk": 0,
+      "deskripsi": "Bilah lurus dengan bentuk seperti tikar pelepah daun.",
+      "tangguh": ["Majapahit", "Mataram", "Madura"],
+      "filosofi": "Simbol ketenangan rumah tangga dan keharmonisan.",
+      "kegunaan_historis": "Mas kawin / mahar para bangsawan."
+    },
+    "sengkelat": {
+      "nama": "Sengkelat",
+      "luk": 13,
+      "deskripsi": "Bilah berluk 13, paling dihormati dan paling sakral.",
+      "tangguh": ["Majapahit", "Mataram Sultan Agung"],
+      "filosofi": "Angka 13 = simbol keberanian tertinggi dan magis.",
+      "kegunaan_historis": "Keris para raja dan panglima perang."
+    },
+    "jalak": {
+      "nama": "Jalak",
+      "luk": 0,
+      "deskripsi": "Bilah lurus dengan gandik (pangkal bilah) berbentuk burung jalak.",
+      "tangguh": ["Madura", "Surakarta"],
+      "filosofi": "Burung jalak = kebebasan jiwa dan kesetiaan.",
+      "kegunaan_historis": "Pusaka para pejabat dan priayi Madura."
+    },
+    "carita": {
+      "nama": "Carita",
+      "luk": 5,
+      "deskripsi": "Bilah berluk 5 dengan ukiran cerita/ornamen khas.",
+      "tangguh": ["Madura", "Cirebon"],
+      "filosofi": "Luk 5 = Pancaindra, kesempurnaan manusia.",
+      "kegunaan_historis": "Keris upacara dan ritual adat."
+    },
+    "sabuk_inten": {
+      "nama": "Sabuk Inten",
+      "luk": 9,
+      "deskripsi": "Bilah berluk 9 dengan pamor berlian di sepanjang bilah.",
+      "tangguh": ["Madura", "Mataram"],
+      "filosofi": "Luk 9 = Wali Songo, penyebaran Islam di Nusantara.",
+      "kegunaan_historis": "Pusaka para ulama dan pemimpin agama Madura."
+    }
+  },
+  "pamor": {
+    "beras_wutah": {
+      "nama": "Beras Wutah",
+      "deskripsi": "Motif tersebar acak seperti beras tertumpah.",
+      "makna": "Rezeki yang melimpah dan berkelanjutan.",
+      "proses": "Pamor mlumah — lipatan logam meteorit/nikel ke atas.",
+      "kelangkaan": "Umum"
+    },
+    "ngulit_semangka": {
+      "nama": "Ngulit Semangka",
+      "deskripsi": "Motif garis-garis lengkung seperti kulit semangka.",
+      "makna": "Kesuburan, kemakmuran, dan keberuntungan.",
+      "proses": "Pamor miring — lipatan diagonal yang presisi.",
+      "kelangkaan": "Sedang"
+    },
+    "blarak_sineret": {
+      "nama": "Blarak Sineret",
+      "deskripsi": "Motif daun kelapa yang diseret/ditarik, garis diagonal halus.",
+      "makna": "Keteguhan hati dalam menghadapi cobaan.",
+      "proses": "Pamor miring teknik tarik, sangat sulit dikerjakan.",
+      "kelangkaan": "Langka"
+    },
+    "wos_wutah": {
+      "nama": "Wos Wutah",
+      "deskripsi": "Pamor butiran halus seperti beras kecil tersebar merata.",
+      "makna": "Kewibawaan dan aura kepemimpinan.",
+      "proses": "Pamor mlumah halus, butuh keahlian tinggi.",
+      "kelangkaan": "Sedang"
+    },
+    "ron_genduru": {
+      "nama": "Ron Genduru",
+      "deskripsi": "Motif daun genduru (sejenis tanaman), naturalis.",
+      "makna": "Ketenangan dan kesucian jiwa.",
+      "proses": "Pamor tiban (terjadi sendiri), sangat langka.",
+      "kelangkaan": "Sangat Langka"
+    }
+  },
+  "empu": {
+    "empu_supo_mandrangi": {
+      "nama": "Empu Supo Mandrangi",
+      "era": "Abad ke-15 (Majapahit akhir)",
+      "asal": "Madura (diyakini)",
+      "keahlian": ["Sengkelat", "Sabuk Inten", "Tilam Upih"],
+      "ciri_khas": "Pamor sangat halus, gandik bermotif kala (raksasa).",
+      "karya_terkenal": "Keris Sengkelat koleksi Keraton Sumenep.",
+      "status": "Historis (legenda)"
+    },
+    "empu_aeng_tongtong": {
+      "nama": "Para Empu Desa Aeng Tongtong",
+      "era": "Abad ke-17 — sekarang",
+      "asal": "Desa Aeng Tongtong, Kec. Saronggi, Kab. Sumenep",
+      "keahlian": ["Brojol", "Tilam Upih", "Jalak", "Carita"],
+      "ciri_khas": "Teknik tempa warisan turun-temurun, baja lokal + meteorit.",
+      "karya_terkenal": "Keris pesanan Museum Keraton Sumenep & kolektor internasional.",
+      "status": "Aktif — UNESCO Intangible Cultural Heritage 2008",
+      "kontak": "Desa Aeng Tongtong, Saronggi, Sumenep, Jawa Timur"
+    },
+    "empu_djeno_harumbrodjo": {
+      "nama": "Empu Djeno Harumbrodjo",
+      "era": "Abad ke-20",
+      "asal": "Yogyakarta (aktif juga untuk keris Madura)",
+      "keahlian": ["Sengkelat", "Sabuk Inten"],
+      "ciri_khas": "Pamor tirto tejo dan beras wutah yang sangat rapi.",
+      "karya_terkenal": "Keris koleksi Keraton Yogyakarta dan Museum Nasional.",
+      "status": "Historis"
+    }
+  },
+  "tangguh": {
+    "madura": {
+      "nama": "Tangguh Madura",
+      "periode": "Abad ke-17 — sekarang",
+      "ciri_visual": [
+        "Bilah cenderung tebal dan kokoh",
+        "Gandik bermotif sederhana namun padat",
+        "Pamor pamor mlumah (Beras Wutah dominan)",
+        "Baja berwarna lebih gelap (besi lokal Madura)",
+        "Ganja (alas bilah) pipih dan lebar"
+      ],
+      "nilai_historis": "Keris Madura mencerminkan karakter masyarakat yang keras, tegas, dan apa adanya — sesuai karakter budaya Madura.",
+      "pusaka_terkenal": "Keris Calonarang (koleksi Keraton Sumenep)"
+    },
+    "majapahit": {
+      "nama": "Tangguh Majapahit",
+      "periode": "Abad ke-13 — ke-15",
+      "ciri_visual": [
+        "Bilah ramping dan panjang",
+        "Pamor langka: Ron Genduru, Blarak Sineret",
+        "Gandik bermotif kala atau naga",
+        "Besi pejagalan (kualitas tertinggi)"
+      ],
+      "nilai_historis": "Era kejayaan Majapahit — keris sebagai senjata dan pusaka kerajaan.",
+      "pusaka_terkenal": "Keris Empu Supo Mandrangi"
+    },
+    "mataram": {
+      "nama": "Tangguh Mataram",
+      "periode": "Abad ke-16 — ke-18",
+      "ciri_visual": [
+        "Bilah proporsional, pamor sangat halus",
+        "Pamor Wos Wutah and Ngulit Semangka dominan",
+        "Detail gandik sangat ornamental"
+      ],
+      "nilai_historis": "Era Sultan Agung — keris sebagai simbol kekuasaan absolut.",
+      "pusaka_terkenal": "Keris Kyai Setan Kober"
+    }
+  },
+  "warangka": {
+    "ladrang": {
+      "nama": "Ladrang",
+      "deskripsi": "Warangka berbentuk seperti perahu, bersayap di bagian atas.",
+      "penggunaan": "Keris para bangsawan dan upacara resmi keraton.",
+      "material": "Kayu cendana, kayu timoho, atau kayu jati pilihan.",
+      "daerah": "Yogyakarta, Solo, dan Madura (bangsawan)"
+    },
+    "gayaman": {
+      "nama": "Gayaman",
+      "deskripsi": "Warangka berbentuk oval, lebih sederhana dari Ladrang.",
+      "penggunaan": "Keris sehari-hari dan keris rakyat.",
+      "material": "Kayu lokal, kadang diberi ukiran sederhana.",
+      "daerah": "Jawa Timur dan Madura (umum)"
+    },
+    "sandang_walikat": {
+      "nama": "Sandang Walikat",
+      "deskripsi": "Warangka khas Madura — lebih tebal, ukiran khas Madura.",
+      "penggunaan": "Keris adat Madura, dipakai dalam ritual dan pernikahan.",
+      "material": "Kayu sono keling atau kayu timoho ukiran Madura.",
+      "daerah": "Eksklusif Madura (Sumenep, Pamekasan)"
+    }
+  },
+  "luk": {
+    "0": { "makna": "Lurus — kejujuran, kepolosan, kesederhanaan" },
+    "3": { "makna": "Luk 3 — Trimurti: Brahma, Wisnu, Siwa. Keseimbangan alam." },
+    "5": { "makna": "Luk 5 — Pancaindra, Pancasila, kesempurnaan manusia." },
+    "7": { "makna": "Luk 7 — Tujuh lapis langit, derajat spiritual tertinggi." },
+    "9": { "makna": "Luk 9 — Wali Songo, penyebaran Islam, kewibawaan ulama." },
+    "11": { "makna": "Luk 11 — Kesempurnaan spiritual dan kekuatan batin." },
+    "13": { "makna": "Luk 13 — Paling sakral. Raja dan panglima. Kekuatan magis tertinggi." }
+  },
+  "status_budaya": {
+    "unesco": "Masterpiece of the Oral and Intangible Heritage of Humanity (2005)",
+    "penetapan_warisan": "UNESCO Intangible Cultural Heritage — Keris Indonesia (2008)",
+    "museum": "Museum Keraton Sumenep, Jl. Dr. Sutomo No. 6, Sumenep",
+    "desa_pengrajin": "Desa Aeng Tongtong, Kecamatan Saronggi, Kabupaten Sumenep",
+    "komunitas": "Himpunan Ahli Keris Indonesia (HAKI) — Cabang Sumenep"
+  }
+}

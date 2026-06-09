@@ -1,0 +1,26 @@
+[project]
+name = "deteksi-keris"
+version = "0.1.0"
+description = "YOLOv26 Kris Detection & Classification for Madura Cultural Heritage Preservation"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "ultralytics>=8.3.50",
+    "beautifulsoup4>=4.12.0",
+    "requests>=2.31.0",
+    "pillow>=10.0.0",
+    "pandas>=2.0.0",
+    "tqdm>=4.65.0",
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0",
+    "python-multipart>=0.0.6",
+]
+
+[tool.pyright]
+include = ["backend"]
+extraPaths = ["backend"]
+pythonVersion = "3.9"
+typeCheckingMode = "basic"
+

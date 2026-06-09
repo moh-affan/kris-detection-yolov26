@@ -1,0 +1,90 @@
+/* CSS Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #0f0800;
+  color: #f5e6c8;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f0800;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C9A84C44;
+  border-radius: 4px;
+  border: 1px solid #C9A84C22;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C9A84C77;
+}
+
+/* CSS spin animation for loaders */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Typography styles */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Cinzel', serif;
+  letter-spacing: 1px;
+}
+
+/* Hover effects and micro-interactions */
+button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  filter: none !important;
+}
+
+/* Autocomplete list glow */
+input, select {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus, select:focus {
+  border-color: #C9A84C !important;
+  box-shadow: 0 0 8px rgba(201, 168, 76, 0.25);
+}
+
+/* Custom layout helpers */
+.img-container {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+}
