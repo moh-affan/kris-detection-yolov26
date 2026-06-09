@@ -94,8 +94,8 @@ uv run python backend/app.py
 Buka terminal baru:
 ```bash
 cd frontend
-npm install
-npm run dev
+bun install
+bun dev
 ```
 Akses dashboard di browser Anda via `http://localhost:3000`.
 
