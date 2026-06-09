@@ -294,7 +294,7 @@ def run_crawler_process(max_pages, output_dir):
                 label_dir = os.path.join(images_dir, label)
                 os.makedirs(label_dir, exist_ok=True)
 
-                for img_idx, img_url in enumerate(meta['gambar_urls'][:2]): # download max 2
+                for img_idx, img_url in enumerate(meta['gambar_urls'][:3]): # download max 3
                     slug = sanitize_filename(meta['judul'][:50])
                     hash_suffix = hashlib.md5(img_url.encode()).hexdigest()[:6]
                     filename = f"{current_count:04d}_{slug}_{img_idx}_{hash_suffix}.jpg"
