@@ -56,7 +56,8 @@ PAMOR_KEYWORDS = [
     'Mrutu Sewu','Kupu Tarung','Tambal','Kelengan','Lawe Saukel',
     'Untu Walang','Lintang Kemukus','Puser Bumi','Banyu Mili',
     'Wahyu Tumurun','Sekar Susun','Melati Sinebar','Manggar',
-    'Blarak Sineret','Sodo Sakler','Satrio Pinayungan'
+    'Blarak Sineret','Sodo Sakler','Satrio Pinayungan','Sodo Lanang',
+    'Kulit Semangka'
 ]
 
 TANGGUH_KEYWORDS = [
@@ -94,7 +95,8 @@ def parse_luk_from_title(title):
     return None
 
 def parse_keyword_from_title(title, keywords):
-    title_lower = str(title).lower()
+    # Replace underscores with spaces to support matching keywords inside filenames
+    title_lower = str(title).lower().replace('_', ' ')
     for kw in sorted(keywords, key=len, reverse=True):
         if str(kw).lower() in title_lower:
             return str(kw)
