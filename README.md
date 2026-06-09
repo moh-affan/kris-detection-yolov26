@@ -99,6 +99,23 @@ bun dev
 ```
 Akses dashboard di browser Anda via `http://localhost:3000`.
 
+
+---
+
+## 📊 Informasi & Sumber Dataset
+
+Dataset yang digunakan dalam proyek ini dikumpulkan dan disusun secara terstruktur dengan rincian sebagai berikut:
+
+### 1. Sumber Data (Data Source)
+Seluruh gambar dan metadata keris diperoleh melalui proses crawling otomatis dari katalog online:
+- **Sumber Utama**: [Pusaka Keris](https://pusakakeris.com/katalog/) (`pusakakeris.com`).
+- **Metode**: Scraper otomatis berbasis Python (`BeautifulSoup` & `requests`) dengan mekanisme kesopanan akses (*politeness rate limit* dengan delay 0.5–1.2 detik per *request*) untuk mengekstrak informasi detail produk, kategori, serta gambar beresolusi tinggi.
+
+### 2. Pipeline Pemrosesan Dataset
+1. **Crawling & Metadata Parsing**: Crawling hingga 54 halaman katalog untuk mengunduh gambar dan menyimpannya ke folder label masing-masing sesuai deteksi kata kunci. Metadata lengkap (Dapur, Pamor, Tangguh, Luk, Harga) disimpan dalam format JSON (`checkpoint.json`).
+2. **AI-Assisted Pre-Annotation**: Penggunaan YOLOv26 pra-latih untuk mendeteksi kandidat koordinat bilah secara offline sebelum anotasi divalidasi oleh kurator/ahli.
+3. **Dataset Splitting**: Pemisahan dataset menggunakan `split_dataset.py` secara acak dengan rasio **80% Train** dan **20% Validation** untuk kebutuhan proses pelatihan model di Google Colab.
+
 ---
 
 ## 🏛️ Latar Belakang & Basis Pengetahuan

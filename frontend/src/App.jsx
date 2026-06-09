@@ -364,29 +364,68 @@ export default function App() {
     }
   }, [currentIdx, images]);
 
-  const saveBoxesToStateAndServer = async (newBoxes, markStatus = null) => {
+  const updateBoxesLocal = (newBoxes, markStatus = null) => {
     if (!currentImg) return;
     setBoxes(newBoxes);
-    
-    // Save to local state
     setImages(prev => prev.map((img, i) => 
       i === currentIdx ? { ...img, boxes: newBoxes, status: markStatus || img.status } : img
     ));
+  };
+
+  const saveBoxesToStateAndServer = async (newBoxes, markStatus = null) => {
+    if (!currentImg) return;
+    
+    // Clean up boxes to ensure types match Pydantic schema (e.g. coerce empty string luk to null)
+    const cleanedBoxes = newBoxes.map(b => {
+      let cleanLuk = b.luk;
+      if (cleanLuk === "" || cleanLuk === undefined || cleanLuk === null) {
+        cleanLuk = null;
+      } else {
+        const parsed = parseInt(cleanLuk);
+        cleanLuk = isNaN(parsed) ? null : parsed;
+      }
+      return {
+        ...b,
+        luk: cleanLuk
+      };
+    });
 
     // Post to FastAPI server
     try {
       const body = {
         filename: currentImg.filename,
         class_folder: currentImg.class_folder,
-        boxes: newBoxes
+        boxes: cleanedBoxes
       };
-      await fetch("/api/annotations/save", {
+      const response = await fetch("/api/annotations/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
       });
+
+      if (!response.ok) {
+        let errText = `HTTP error! status: ${response.status}`;
+        try {
+          const errData = await response.json();
+          if (errData && errData.detail) {
+            if (typeof errData.detail === "string") {
+              errText = errData.detail;
+            } else {
+              errText = JSON.stringify(errData.detail);
+            }
+          }
+        } catch (_) {}
+        throw new Error(errText);
+      }
+
+      // Update state only on success
+      setBoxes(newBoxes);
+      setImages(prev => prev.map((img, i) => 
+        i === currentIdx ? { ...img, boxes: newBoxes, status: markStatus || img.status } : img
+      ));
     } catch (e) {
       console.error("Failed saving annotation to backend:", e);
+      await showAlert("Gagal Menyimpan Anotasi", "Gagal menyimpan perubahan ke server backend. Detail: " + e.message);
     }
   };
 
@@ -471,7 +510,7 @@ export default function App() {
         };
         
         const updated = [...boxes, newBox];
-        saveBoxesToStateAndServer(updated);
+        updateBoxesLocal(updated);
         setSelectedBox(newBox.id);
         setEditingMeta({
           dhapur: "",
@@ -556,7 +595,7 @@ export default function App() {
   const onMouseUp = (e) => {
     if (resizingBox) {
       setBoxes(prev => {
-        saveBoxesToStateAndServer(prev);
+        updateBoxesLocal(prev);
         return prev;
       });
       setResizingBox(null);
@@ -598,7 +637,7 @@ export default function App() {
     };
 
     const updated = [...boxes, newBox];
-    saveBoxesToStateAndServer(updated);
+    updateBoxesLocal(updated);
     setSelectedBox(newBox.id);
     setEditingMeta({
       dhapur: "",
@@ -668,7 +707,7 @@ export default function App() {
           confirmed: false
         }));
         setBoxes(parsedBoxes);
-        saveBoxesToStateAndServer(parsedBoxes);
+        updateBoxesLocal(parsedBoxes);
         
         // select the first one
         setSelectedBox(parsedBoxes[0].id);

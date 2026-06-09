@@ -104,14 +104,35 @@ def parse_keyword_from_title(title, keywords):
 
 def parse_categories(soup):
     cats = []
-    breadcrumb = soup.find('nav', class_='breadcrumb')
+    
+    # 1. Look in WooCommerce breadcrumbs
+    breadcrumb = (
+        soup.find('nav', class_='woocommerce-breadcrumb') or 
+        soup.find('nav', class_='breadcrumb') or 
+        soup.find('div', class_='breadcrumbs')
+    )
     if breadcrumb:
         for a in breadcrumb.find_all('a'):
-            cats.append(a.text.strip())
-    for a in soup.find_all('a', href=re.compile(r'/category/')):
-        txt = a.text.strip()
-        if txt and txt not in cats:
-            cats.append(txt)
+            txt = a.text.strip()
+            if txt and txt not in cats:
+                cats.append(txt)
+                
+    # 2. Look in WooCommerce product meta (.posted_in)
+    posted_in = soup.find('span', class_='posted_in')
+    if posted_in:
+        for a in posted_in.find_all('a'):
+            txt = a.text.strip()
+            if txt and txt not in cats:
+                cats.append(txt)
+                
+    # 3. Look in the main product container (.product)
+    product_div = soup.find('div', class_='product')
+    if product_div:
+        for a in product_div.find_all('a', href=re.compile(r'/category/')):
+            txt = a.text.strip()
+            if txt and txt not in cats:
+                cats.append(txt)
+                
     return cats
 
 def parse_product_page(url, soup):
