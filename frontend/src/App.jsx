@@ -218,6 +218,10 @@ export default function App() {
   const [detections, setDetections] = useState([]);
   const [selectedDetectIdx, setSelectedDetectIdx] = useState(0);
   const [cameraActive, setCameraActive] = useState(false);
+  const [confThreshold, setConfThreshold] = useState(0.15);
+  const [modelInfo, setModelInfo] = useState(null); // null = belum di-fetch
+  const [modelInfoLoading, setModelInfoLoading] = useState(false);
+  const [lastDetectHadResult, setLastDetectHadResult] = useState(null); // true/false/null
   
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -270,6 +274,7 @@ export default function App() {
       const file = new File([blob], "live_frame.jpg", { type: "image/jpeg" });
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("conf_threshold", confThreshold);
 
       try {
         const r = await fetch("/api/detect", { method: "POST", body: formData });
@@ -280,6 +285,7 @@ export default function App() {
           // Auto-select first kris detected for immediate cultural display
           setSelectedDetectIdx(0);
         }
+        if (d.model_info) setModelInfo(d.model_info);
       } catch (err) {
         console.error("Live detection failed:", err);
       }
@@ -290,6 +296,9 @@ export default function App() {
   useEffect(() => {
     if (activeTab !== "detect") {
       stopCamera();
+    } else {
+      // Fetch model info saat masuk ke tab detect
+      fetchModelInfo();
     }
   }, [activeTab]);
 
@@ -807,6 +816,19 @@ export default function App() {
     setDetectFile(file);
     setDetectPreview(URL.createObjectURL(file));
     setDetections([]);
+    setLastDetectHadResult(null);
+  };
+
+  const fetchModelInfo = async () => {
+    setModelInfoLoading(true);
+    try {
+      const r = await fetch("/api/model/info");
+      const d = await r.json();
+      setModelInfo(d);
+    } catch (e) {
+      console.error("Failed to fetch model info:", e);
+    }
+    setModelInfoLoading(false);
   };
 
   const runRealTimeDetection = async () => {
@@ -815,12 +837,18 @@ export default function App() {
     try {
       const formData = new FormData();
       formData.append("file", detectFile);
+      formData.append("conf_threshold", confThreshold);
       const r = await fetch("/api/detect", { method: "POST", body: formData });
       const d = await r.json();
-      setDetections(d.detections || []);
+      const dets = d.detections || [];
+      setDetections(dets);
       setSelectedDetectIdx(0);
+      setLastDetectHadResult(dets.length > 0);
+      // Update model info dari response terbaru
+      if (d.model_info) setModelInfo(d.model_info);
     } catch (e) {
       await showAlert("Deteksi Gagal", "Inference failed: " + e.message);
+      setLastDetectHadResult(false);
     }
     setDetectLoading(false);
   };
@@ -1767,75 +1795,154 @@ export default function App() {
 
         {/* --- TAB 3: REAL-TIME DETECTION (INFERENCE) --- */}
         {activeTab === "detect" && (
-          <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24, maxWidth: 1100, margin: "0 auto", width: "100%", overflowY: "auto", flex: 1 }}>
-            
-            {/* Mode selection header */}
+          <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20, maxWidth: 1100, margin: "0 auto", width: "100%", overflowY: "auto", flex: 1 }}>
+
+            {/* ── Banner Status Model ──────────────────────────────────────── */}
+            {modelInfo && (
+              <div style={{
+                background: modelInfo.is_finetuned
+                  ? "rgba(46,204,113,0.08)" : "rgba(192,57,43,0.10)",
+                border: `1px solid ${modelInfo.is_finetuned ? "rgba(46,204,113,0.4)" : "rgba(192,57,43,0.45)"}`,
+                borderRadius: 10, padding: "12px 18px",
+                display: "flex", alignItems: "flex-start", gap: 14, flexWrap: "wrap"
+              }}>
+                <div style={{ fontSize: 22, lineHeight: 1 }}>
+                  {modelInfo.is_finetuned ? "✅" : "⚠️"}
+                </div>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 3,
+                    color: modelInfo.is_finetuned ? GREEN : "#e74c3c" }}>
+                    {modelInfo.is_finetuned
+                      ? `MODEL FINE-TUNED AKTIF — ${modelInfo.model_file}`
+                      : "MODEL PRETRAINED COCO — BELUM DI-FINETUNE UNTUK KERIS"}
+                  </div>
+                  <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
+                    {modelInfo.message}
+                  </div>
+                  {!modelInfo.is_finetuned && (
+                    <div style={{ marginTop: 6, fontSize: 11, color: GOLD }}>
+                      💡 Selesaikan fine-tuning di Google Colab → hasilkan <code style={{color: TEAL}}>best.pt</code> → letakkan di folder <code style={{color: TEAL}}>runs/keris/yolov26_madura_kris/weights/</code> → klik <b>Reload Model</b>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, alignSelf: "center" }}>
+                  <button
+                    onClick={async () => {
+                      setModelInfoLoading(true);
+                      try {
+                        const r = await fetch("/api/model/reload", { method: "POST" });
+                        const d = await r.json();
+                        if (d.model_info) setModelInfo(d.model_info);
+                      } catch(e) { console.error(e); }
+                      setModelInfoLoading(false);
+                    }}
+                    disabled={modelInfoLoading}
+                    style={{
+                      background: DARK3, border: `1px solid ${GOLD}44`, color: GOLD,
+                      borderRadius: 6, padding: "5px 12px", cursor: modelInfoLoading ? "default" : "pointer",
+                      fontSize: 11, fontWeight: 700, whiteSpace: "nowrap"
+                    }}
+                  >
+                    {modelInfoLoading ? "..." : "🔄 Reload Model"}
+                  </button>
+                  <div style={{ fontSize: 10, color: MUTED, textAlign: "center" }}>
+                    {modelInfo.num_classes} kelas dikenali
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Mode & Threshold Controls ────────────────────────────────── */}
             <div style={{
               background: DARK2, border: `1px solid ${GOLD}33`, borderRadius: 10,
-              padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between"
+              padding: "14px 20px", display: "flex", alignItems: "center",
+              justifyContent: "space-between", gap: 16, flexWrap: "wrap"
             }}>
-              <div>
-                <h4 style={{ margin: 0, color: GOLD, fontSize: 14 }}>Metode Input Pengenalan</h4>
-                <p style={{ margin: 0, fontSize: 11, color: MUTED }}>Pilih antara unggah foto statis atau kamera real-time</p>
+              {/* Mode buttons */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <h4 style={{ margin: 0, color: GOLD, fontSize: 13 }}>Metode Input</h4>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => { stopCamera(); setDetectMode("upload"); }}
+                    style={{
+                      background: detectMode === "upload" ? GOLD : DARK3,
+                      color: detectMode === "upload" ? DARK : CREAM,
+                      border: `1px solid ${GOLD}44`, borderRadius: 6,
+                      padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700
+                    }}
+                  >
+                    📁 File Upload
+                  </button>
+                  <button
+                    onClick={() => { setDetectMode("camera"); startCamera(); }}
+                    style={{
+                      background: detectMode === "camera" ? GOLD : DARK3,
+                      color: detectMode === "camera" ? DARK : CREAM,
+                      border: `1px solid ${GOLD}44`, borderRadius: 6,
+                      padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700
+                    }}
+                  >
+                    📷 Kamera Live
+                  </button>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => {
-                    stopCamera();
-                    setDetectMode("upload");
-                  }}
-                  style={{
-                    background: detectMode === "upload" ? GOLD : DARK3,
-                    color: detectMode === "upload" ? DARK : CREAM,
-                    border: `1px solid ${GOLD}44`, borderRadius: 6,
-                    padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700
-                  }}
-                >
-                  📁 File Upload
-                </button>
-                <button
-                  onClick={() => {
-                    setDetectMode("camera");
-                    startCamera();
-                  }}
-                  style={{
-                    background: detectMode === "camera" ? GOLD : DARK3,
-                    color: detectMode === "camera" ? DARK : CREAM,
-                    border: `1px solid ${GOLD}44`, borderRadius: 6,
-                    padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700
-                  }}
-                >
-                  📷 Kamera Live
-                </button>
+
+              {/* Confidence Threshold Slider */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 260 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label style={{ fontSize: 11, color: GOLD, fontWeight: 700 }}>
+                    THRESHOLD KEPERCAYAAN
+                  </label>
+                  <span style={{
+                    background: DARK3, border: `1px solid ${GOLD}44`,
+                    borderRadius: 4, padding: "2px 8px",
+                    fontSize: 12, fontWeight: 700, color: confThreshold >= 0.5 ? GREEN : confThreshold >= 0.25 ? GOLD : TEAL
+                  }}>
+                    {Math.round(confThreshold * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="5" max="90" step="5"
+                  value={Math.round(confThreshold * 100)}
+                  onChange={e => setConfThreshold(parseInt(e.target.value) / 100)}
+                  style={{ width: "100%", accentColor: GOLD, cursor: "pointer" }}
+                />
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: MUTED }}>
+                  <span>5% — Sangat Sensitif</span>
+                  <span style={{ color: confThreshold < 0.25 ? TEAL : MUTED }}>
+                    {confThreshold < 0.25 ? "⬅ Direkomendasikan sebelum fine-tuning" : ""}
+                  </span>
+                  <span>90% — Ketat</span>
+                </div>
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 24 }}>
-              
-              {/* Left Viewport Upload & Results */}
+            <div style={{ display: "grid", gridTemplateColumns: "1.25fr 1fr", gap: 24 }}>
+
+              {/* ── Left: Viewport ──────────────────────────────────────────── */}
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                
+
                 {detectMode === "upload" ? (
                   <>
-                    {/* Upload dragzone */}
+                    {/* Upload drag-zone */}
                     <div style={{
                       background: DARK2, border: `2px dashed ${GOLD}44`,
-                      borderRadius: 12, padding: 24, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 12
+                      borderRadius: 12, padding: "20px 24px", textAlign: "center",
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 12
                     }}>
-                      <Upload size={32} color={GOLD} />
+                      <Upload size={28} color={GOLD} />
                       <div>
                         <h4 style={{ margin: "0 0 4px", fontSize: 14 }}>Unggah Foto Keris untuk Identifikasi</h4>
-                        <span style={{ fontSize: 11, color: MUTED }}>Mendukung format JPG, JPEG, PNG</span>
+                        <span style={{ fontSize: 11, color: MUTED }}>Mendukung format JPG, JPEG, PNG — pastikan bilah keris terlihat jelas</span>
                       </div>
-                      
-                      <input 
-                        type="file" 
-                        id="detect-file-input" 
+                      <input
+                        type="file"
+                        id="detect-file-input"
                         accept="image/*"
-                        onChange={handleDetectUpload} 
+                        onChange={handleDetectUpload}
                         style={{ display: "none" }}
                       />
-                      
                       <div style={{ display: "flex", gap: 8 }}>
                         <button
                           onClick={() => document.getElementById("detect-file-input").click()}
@@ -1846,7 +1953,6 @@ export default function App() {
                         >
                           Pilih File Gambar
                         </button>
-                        
                         <button
                           onClick={runRealTimeDetection}
                           disabled={!detectFile || detectLoading}
@@ -1855,59 +1961,53 @@ export default function App() {
                             color: (!detectFile || detectLoading) ? MUTED : DARK,
                             border: "none", borderRadius: 6, padding: "8px 20px",
                             cursor: (!detectFile || detectLoading) ? "default" : "pointer",
-                            fontWeight: 700, fontSize: 12
+                            fontWeight: 700, fontSize: 12,
+                            display: "flex", alignItems: "center", gap: 6
                           }}
                         >
-                          {detectLoading ? "Sedang Menganalisis..." : "Jalankan Deteksi YOLO26"}
+                          <Eye size={13} />
+                          {detectLoading ? "Menganalisis..." : "Jalankan Deteksi YOLOv26"}
                         </button>
                       </div>
                     </div>
 
-                    {/* Upload preview image with bbox drawn */}
+                    {/* Preview + bbox overlay */}
                     {detectPreview && (
                       <div style={{
                         background: DARK2, border: `1px solid ${GOLD}33`,
-                        borderRadius: 12, padding: 16, display: "flex", justifyContent: "center", alignItems: "center"
+                        borderRadius: 12, padding: 16, display: "flex",
+                        justifyContent: "center", alignItems: "center"
                       }}>
                         <div style={{ position: "relative", display: "inline-block" }}>
-                          <img 
-                            src={detectPreview} 
-                            style={{ display: "block", maxWidth: "100%", maxHeight: "50vh", borderRadius: 6 }} 
+                          <img
+                            src={detectPreview}
+                            style={{ display: "block", maxWidth: "100%", maxHeight: "48vh", borderRadius: 6 }}
                           />
-                          
-                          {/* Detection boxes overlay */}
                           <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
                             {detections.map((det, idx) => {
                               const isSel = idx === selectedDetectIdx;
-                              const color = isSel ? GOLD : TEAL;
+                              const color = det.is_proxy ? "#e67e22" : (isSel ? GOLD : TEAL);
                               const { x, y, w, h } = det.bbox;
                               return (
-                                <g 
-                                  key={idx} 
-                                  onClick={() => setSelectedDetectIdx(idx)}
-                                  style={{ cursor: "pointer" }}
-                                >
+                                <g key={idx} onClick={() => setSelectedDetectIdx(idx)} style={{ cursor: "pointer" }}>
                                   <rect
-                                    x={`${x * 100}%`}
-                                    y={`${y * 100}%`}
-                                    width={`${w * 100}%`}
-                                    height={`${h * 100}%`}
-                                    fill={`${color}15`}
-                                    stroke={color}
+                                    x={`${x * 100}%`} y={`${y * 100}%`}
+                                    width={`${w * 100}%`} height={`${h * 100}%`}
+                                    fill={`${color}15`} stroke={color}
                                     strokeWidth={isSel ? 3 : 1.5}
+                                    strokeDasharray={det.is_proxy ? "6,3" : "none"}
                                   />
                                   <foreignObject
-                                    x={`${x * 100}%`}
-                                    y={`${y * 100 - 20}%`}
-                                    width="120"
-                                    height="20"
+                                    x={`${x * 100}%`} y={`${Math.max(0, y * 100 - 7)}%`}
+                                    width="160" height="22"
                                   >
                                     <div style={{
-                                      background: color, color: DARK, padding: "2px 6px",
+                                      background: color, color: DARK, padding: "2px 7px",
                                       fontSize: 9, fontWeight: 700, borderRadius: "4px 4px 0 0",
-                                      display: "inline-block"
+                                      display: "inline-block", maxWidth: "100%",
+                                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
                                     }}>
-                                      #{idx + 1} {det.label} ({Math.round(det.confidence * 100)}%)
+                                      {det.is_proxy ? "≈ " : ""}#{idx + 1} {det.label} ({Math.round(det.confidence * 100)}%)
                                     </div>
                                   </foreignObject>
                                 </g>
@@ -1919,13 +2019,14 @@ export default function App() {
                     )}
                   </>
                 ) : (
-                  /* Camera Mode Viewport */
+                  /* Camera Mode */
                   <div style={{
                     background: DARK2, border: `1px solid ${GOLD}33`,
-                    borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 12
+                    borderRadius: 12, padding: 16, display: "flex", flexDirection: "column",
+                    alignItems: "center", gap: 12
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
-                      <span style={{ fontSize: 12, color: GOLD, fontWeight: 700 }}>LIVE FEED INFRASTRUKTUR KAMERA</span>
+                      <span style={{ fontSize: 12, color: GOLD, fontWeight: 700 }}>LIVE FEED KAMERA</span>
                       <button
                         onClick={cameraActive ? stopCamera : startCamera}
                         style={{
@@ -1938,50 +2039,31 @@ export default function App() {
                         {cameraActive ? "⏹ Matikan Kamera" : "▶ Aktifkan Kamera"}
                       </button>
                     </div>
-
-                    <div style={{ position: "relative", width: "100%", background: "#000", borderRadius: 8, overflow: "hidden", minHeight: 320 }}>
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        style={{ display: "block", width: "100%", height: "auto", minHeight: 320 }}
-                      />
-
-                      {/* Bounding box SVG overlays */}
+                    <div style={{ position: "relative", width: "100%", background: "#000", borderRadius: 8, overflow: "hidden", minHeight: 300 }}>
+                      <video ref={videoRef} autoPlay playsInline muted
+                        style={{ display: "block", width: "100%", height: "auto", minHeight: 300 }} />
                       {cameraActive && (
                         <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
                           {detections.map((det, idx) => {
                             const isSel = idx === selectedDetectIdx;
-                            const color = isSel ? GOLD : TEAL;
+                            const color = det.is_proxy ? "#e67e22" : (isSel ? GOLD : TEAL);
                             const { x, y, w, h } = det.bbox;
                             return (
-                              <g 
-                                key={idx}
-                                onClick={() => setSelectedDetectIdx(idx)}
-                                style={{ cursor: "pointer" }}
-                              >
+                              <g key={idx} onClick={() => setSelectedDetectIdx(idx)} style={{ cursor: "pointer" }}>
                                 <rect
-                                  x={`${x * 100}%`}
-                                  y={`${y * 100}%`}
-                                  width={`${w * 100}%`}
-                                  height={`${h * 100}%`}
-                                  fill={`${color}10`}
-                                  stroke={color}
+                                  x={`${x * 100}%`} y={`${y * 100}%`}
+                                  width={`${w * 100}%`} height={`${h * 100}%`}
+                                  fill={`${color}10`} stroke={color}
                                   strokeWidth={isSel ? 3 : 1.5}
+                                  strokeDasharray={det.is_proxy ? "6,3" : "none"}
                                 />
-                                <foreignObject
-                                  x={`${x * 100}%`}
-                                  y={`${y * 100 - 20}%`}
-                                  width="120"
-                                  height="20"
-                                >
+                                <foreignObject x={`${x * 100}%`} y={`${Math.max(0, y * 100 - 7)}%`} width="140" height="20">
                                   <div style={{
                                     background: color, color: DARK, padding: "2px 5px",
                                     fontSize: 8, fontWeight: 700, borderRadius: "4px 4px 0 0",
                                     display: "inline-block"
                                   }}>
-                                    #{idx + 1} {det.label} ({Math.round(det.confidence * 100)}%)
+                                    {det.is_proxy ? "≈ " : ""}#{idx+1} {det.label} ({Math.round(det.confidence * 100)}%)
                                   </div>
                                 </foreignObject>
                               </g>
@@ -1989,7 +2071,6 @@ export default function App() {
                           })}
                         </svg>
                       )}
-
                       {!cameraActive && (
                         <div style={{
                           position: "absolute", inset: 0, display: "flex", flexDirection: "column",
@@ -2000,114 +2081,233 @@ export default function App() {
                         </div>
                       )}
                     </div>
+                    {cameraActive && (
+                      <div style={{ fontSize: 10, color: MUTED, textAlign: "center" }}>
+                        Deteksi otomatis setiap 750ms • Threshold: {Math.round(confThreshold * 100)}%
+                        {modelInfo && !modelInfo.is_finetuned && (
+                          <span style={{ color: "#e67e22" }}> • Mode proxy COCO (garis putus-putus)</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Right Viewport Cultural Metadata Card */}
-              <div style={{ display: "flex", flexDirection: "column" }}>
+              {/* ── Right: Cultural Metadata / Empty State ───────────────── */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
                 {detections.length > 0 ? (
                   (() => {
                     const activeDet = detections[selectedDetectIdx];
                     if (!activeDet) return null;
-                    const meta = activeDet.cultural_meta;
-                    const d = meta.dapur;
-                    const p = meta.pamor;
-                    const e = meta.empu;
-                    const t = meta.tangguh;
-                    const w = meta.warangka;
-                    const l = meta.luk_info;
+                    const meta = activeDet.cultural_meta || {};
+                    const d  = meta.dapur    || {};
+                    const p  = meta.pamor    || {};
+                    const e  = meta.empu     || {};
+                    const t  = meta.tangguh  || {};
+                    const w  = meta.warangka || {};
+                    const l  = meta.luk_info || {};
                     const lk = meta.luk_count;
-                    const sb = meta.status_budaya;
-                    
-                    const lukStr = lk === 0 ? "Lurus (0 Luk)" : `Luk ${lk}`;
-                    
+                    const sb = meta.status_budaya || {};
+                    const lukStr = lk === 0 ? "Lurus (0 Luk)" : (lk ? `Luk ${lk}` : "Tidak Diketahui");
+
                     return (
                       <div style={{
                         background: "linear-gradient(135deg, #1a0e00 0%, #2d1a00 50%, #1a0e00 100%)",
-                        border: `2px solid ${GOLD}`, borderRadius: 12, padding: 24,
-                        color: CREAM, display: "flex", flexDirection: "column", gap: 16,
-                        boxShadow: "0 8px 32px rgba(201,168,76,0.15)"
+                        border: `2px solid ${activeDet.is_proxy ? "#e67e22" : GOLD}`,
+                        borderRadius: 12, padding: 22, color: CREAM,
+                        display: "flex", flexDirection: "column", gap: 14,
+                        boxShadow: `0 8px 32px rgba(${activeDet.is_proxy ? "230,126,34" : "201,168,76"},0.15)`
                       }}>
+                        {/* Header */}
                         <div style={{
-                          fontFamily: "'Cinzel', serif", fontSize: 18, color: GOLD,
-                          borderBottom: `1px solid ${GOLD}44`, paddingBottom: 10,
-                          display: "flex", alignItems: "center", justifyContent: "space-between"
+                          fontFamily: "'Cinzel', serif", fontSize: 16, color: activeDet.is_proxy ? "#e67e22" : GOLD,
+                          borderBottom: `1px solid ${activeDet.is_proxy ? "#e67e2244" : GOLD + "44"}`, paddingBottom: 10,
+                          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8
                         }}>
                           <span>🗡️ DETAIL BUDAYA KERIS #{selectedDetectIdx + 1}</span>
-                          <span style={{
-                            background: GOLD, color: DARK, fontSize: 11,
-                            fontWeight: 700, padding: "2px 8px", borderRadius: 12
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {activeDet.is_proxy && (
+                              <span style={{
+                                background: "rgba(230,126,34,0.15)", color: "#e67e22",
+                                border: "1px solid #e67e2255", fontSize: 9,
+                                fontWeight: 700, padding: "2px 8px", borderRadius: 12
+                              }}>
+                                ≈ PROXY COCO: {activeDet.raw_coco_name}
+                              </span>
+                            )}
+                            <span style={{
+                              background: activeDet.is_proxy ? "#e67e22" : GOLD, color: DARK,
+                              fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 12
+                            }}>
+                              Akurasi: {Math.round(activeDet.confidence * 100)}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Proxy warning */}
+                        {activeDet.is_proxy && (
+                          <div style={{
+                            background: "rgba(230,126,34,0.08)", border: "1px solid rgba(230,126,34,0.3)",
+                            borderRadius: 6, padding: "8px 12px", fontSize: 11, color: "#e67e22", lineHeight: 1.5
                           }}>
-                            Akurasi: {Math.round(activeDet.confidence * 100)}%
-                          </span>
+                            ⚠️ <b>Deteksi Proxy:</b> Model pretrained COCO mendeteksi objek mirip bilah (<i>{activeDet.raw_coco_name}</i>).
+                            Metadata budaya di bawah adalah <b>estimasi</b> — akurasi rendah sebelum fine-tuning selesai.
+                          </div>
+                        )}
+
+                        {/* Pilih deteksi jika lebih dari 1 */}
+                        {detections.length > 1 && (
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {detections.map((_, i) => (
+                              <button key={i}
+                                onClick={() => setSelectedDetectIdx(i)}
+                                style={{
+                                  background: i === selectedDetectIdx ? GOLD : DARK3,
+                                  color: i === selectedDetectIdx ? DARK : CREAM,
+                                  border: `1px solid ${GOLD}44`, borderRadius: 4,
+                                  padding: "3px 10px", cursor: "pointer", fontSize: 11, fontWeight: 700
+                                }}
+                              >
+                                #{i + 1}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Grid info utama */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          {[
+                            { icon: "⚔️", key: "DAPUR (BILAH)",   val: d.nama || "—",  sub: d.deskripsi || "Bilah keris khas Madura" },
+                            { icon: "✨", key: "PAMOR (MOTIF)",   val: p.nama || "—",  sub: p.makna     || "Simbol keberuntungan" },
+                            { icon: "🏛️", key: "EMPU / PENGRAJIN", val: e.nama || "Para Empu Aeng Tongtong", sub: e.era || "Desa Sumenep" },
+                            { icon: "📅", key: "TANGGUH (ERA)",   val: t.nama || "Tangguh Madura", sub: t.periode || "Abad ke-17 - Sekarang" },
+                          ].map(({ icon, key, val, sub }) => (
+                            <div key={key} style={{
+                              background: "rgba(201,168,76,0.04)", border: `1px solid ${GOLD}22`,
+                              borderRadius: 8, padding: 10
+                            }}>
+                              <div style={{ fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: 1 }}>{icon} {key}</div>
+                              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{val}</div>
+                              <div style={{ fontSize: 10, color: MUTED, marginTop: 2, lineHeight: 1.4 }}>{sub}</div>
+                            </div>
+                          ))}
                         </div>
 
-                        {/* Grid info */}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                          
-                          <div style={{ background: "rgba(201,168,76,0.05)", border: `1px solid ${GOLD}22`, borderRadius: 8, padding: 10 }}>
-                            <div style={{ fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: 1 }}>⚔️ DAPUR (BILAH)</div>
-                            <div style={{ fontSize: 14, fontWeight: 700 }}>{d.nama || "Jalak"}</div>
-                            <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{d.deskripsi || "Bilah lurus khas Madura"}</div>
-                          </div>
-
-                          <div style={{ background: "rgba(201,168,76,0.05)", border: `1px solid ${GOLD}22`, borderRadius: 8, padding: 10 }}>
-                            <div style={{ fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: 1 }}>✨ PAMOR (MOTIF)</div>
-                            <div style={{ fontSize: 14, fontWeight: 700 }}>{p.nama || "Beras Wutah"}</div>
-                            <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{p.makna || "Rezeki yang melimpah"}</div>
-                          </div>
-
-                          <div style={{ background: "rgba(201,168,76,0.05)", border: `1px solid ${GOLD}22`, borderRadius: 8, padding: 10 }}>
-                            <div style={{ fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: 1 }}>🏛️ EMPU / PENGRAJIN</div>
-                            <div style={{ fontSize: 14, fontWeight: 700 }}>{e.nama || "Para Empu Aeng Tongtong"}</div>
-                            <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{e.era || "Desa Pengrajin Sumenep"}</div>
-                          </div>
-
-                          <div style={{ background: "rgba(201,168,76,0.05)", border: `1px solid ${GOLD}22`, borderRadius: 8, padding: 10 }}>
-                            <div style={{ fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: 1 }}>📅 TANGGUH (ERA)</div>
-                            <div style={{ fontSize: 14, fontWeight: 700 }}>{t.nama || "Tangguh Madura"}</div>
-                            <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{t.periode || "Abad ke-17 - Sekarang"}</div>
-                          </div>
-
-                        </div>
-
-                        {/* Luk Meaning */}
+                        {/* Luk filosofi */}
                         <div style={{ background: "rgba(201,168,76,0.03)", borderLeft: `3px solid ${GOLD}`, padding: 12, borderRadius: "0 8px 8px 0" }}>
-                          <div style={{ fontSize: 10, color: GOLD, fontWeight: 700, marginBottom: 4 }}>🌀 KONDISI BILAH & FILOSOFI LUK ({lukStr})</div>
-                          <div style={{ fontSize: 12, color: CREAM, fontStyle: "italic" }}>{l.makna || "Bilah lurus mencerminkan kejujuran dan kemantapan jiwa."}</div>
+                          <div style={{ fontSize: 10, color: GOLD, fontWeight: 700, marginBottom: 4 }}>
+                            🌀 KONDISI BILAH & LUK — {lukStr}
+                          </div>
+                          <div style={{ fontSize: 12, color: CREAM, fontStyle: "italic", lineHeight: 1.5 }}>
+                            {l.makna || "Bilah keris menyimpan filosofi mendalam tentang keseimbangan alam dan kehidupan."}
+                          </div>
                         </div>
 
-                        {/* Cultural description notes */}
-                        <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
-                          <b>Filosofi Dapur:</b> {d.filosofi || "Karakteristik bilah keris Madura yang melambangkan kejujuran dan ketegasan sikap."}<br/>
+                        {/* Filosofi dapur + pamor */}
+                        <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
+                          <b>Filosofi Dapur:</b> {d.filosofi || "Karakteristik bilah keris Madura — simbol kejujuran dan ketegasan."}<br/>
                           <b>Metode Pamor:</b> {p.proses || "Proses tempa lipatan baja nikel meteorit khas Madura Timur."}
                         </div>
 
-                        {/* UNESCO warisan banner */}
+                        {/* UNESCO */}
                         <div style={{
-                          background: "rgba(0,100,200,0.1)", border: "1px solid rgba(0,150,255,0.25)",
-                          borderRadius: 6, padding: "8px 12px", fontSize: 10, color: "#90caf9", lineHeight: 1.4
+                          background: "rgba(0,100,200,0.08)", border: "1px solid rgba(0,150,255,0.2)",
+                          borderRadius: 6, padding: "8px 12px", fontSize: 10, color: "#90caf9", lineHeight: 1.5
                         }}>
-                          🏛️ <b>Warisan Budaya Dunia UNESCO:</b> {sb.unesco || "Keris Indonesia diakui UNESCO sejak 2008."}<br/>
-                          📍 <b>Desa Mitra:</b> {sb.desa_pengrajin || "Desa Aeng Tongtong, Saronggi, Sumenep"}
+                          🏛️ <b>Warisan Budaya UNESCO:</b> {sb.unesco || "Keris Indonesia diakui UNESCO sejak 2008."}<br/>
+                          📍 <b>Desa Mitra:</b> {sb.desa_pengrajin || "Desa Aeng Tongtong, Saronggi, Sumenep, Jawa Timur"}
                         </div>
-
                       </div>
                     );
                   })()
                 ) : (
+                  /* ── Empty State Informatif ─────────────────────────────── */
                   <div style={{
-                    background: DARK2, border: `1px solid ${GOLD}22`, borderRadius: 12, padding: 48,
-                    textAlign: "center", color: MUTED, display: "flex", flexDirection: "column", alignItems: "center", gap: 12
+                    background: DARK2, border: `1px solid ${GOLD}22`, borderRadius: 12,
+                    padding: 28, display: "flex", flexDirection: "column", gap: 18
                   }}>
-                    <Info size={36} color={GOLD} />
-                    <div>
-                      <h4 style={{ margin: "0 0 4px", color: CREAM }}>Hasil Deteksi Budaya</h4>
-                      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.6 }}>
-                        Silakan unggah gambar di sebelah kiri atau aktifkan kamera live untuk mendeteksi keris dan memunculkan metadata nilai filosofinya.
+
+                    {/* Judul empty state — beda pesan jika sudah deteksi tapi 0 hasil */}
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 32, marginBottom: 8 }}>
+                        {lastDetectHadResult === false ? "🔍" : "🗡️"}
+                      </div>
+                      <h4 style={{ margin: "0 0 6px", color: CREAM, fontSize: 15 }}>
+                        {lastDetectHadResult === false
+                          ? "Tidak Ada Objek Terdeteksi"
+                          : "Siap Mengidentifikasi Keris"}
+                      </h4>
+                      <p style={{ margin: 0, fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
+                        {lastDetectHadResult === false
+                          ? `Tidak ada objek yang memenuhi threshold ${Math.round(confThreshold * 100)}%. Coba turunkan threshold atau gunakan foto yang lebih jelas.`
+                          : "Unggah foto keris atau aktifkan kamera untuk memulai identifikasi dan menampilkan metadata budaya Madura."}
                       </p>
                     </div>
+
+                    {/* Tips jika 0 hasil setelah deteksi */}
+                    {lastDetectHadResult === false && (
+                      <div style={{
+                        background: "rgba(201,168,76,0.05)", border: `1px solid ${GOLD}22`,
+                        borderRadius: 8, padding: 14
+                      }}>
+                        <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 8 }}>
+                          💡 Saran Perbaikan
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: MUTED, lineHeight: 1.8 }}>
+                          {!modelInfo?.is_finetuned && (
+                            <li>Turunkan threshold ke <b style={{ color: TEAL }}>10–15%</b> — model belum di-finetune, proxy COCO butuh sensitivitas tinggi</li>
+                          )}
+                          <li>Pastikan bilah keris (bukan gagang) terlihat <b>penuh</b> di gambar</li>
+                          <li>Gunakan foto dengan latar belakang <b>kontras</b> (putih/hitam polos)</li>
+                          <li>Hindari foto buram, gelap, atau dari sudut ekstrem</li>
+                          {modelInfo?.is_finetuned && (
+                            <li>Jika model fine-tuned tetap gagal, coba <b>naikkan epoch training</b> di notebook</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Panduan foto ideal */}
+                    <div style={{ borderTop: `1px solid ${GOLD}22`, paddingTop: 16 }}>
+                      <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 10 }}>
+                        📸 Panduan Foto untuk Hasil Terbaik
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        {[
+                          { icon: "✅", label: "Bilah tampak keseluruhan", desc: "Dari pucuk hingga gandik" },
+                          { icon: "✅", label: "Latar belakang kontras", desc: "Kain hitam atau putih polos" },
+                          { icon: "✅", label: "Pencahayaan merata", desc: "Hindari bayangan atau overexpose" },
+                          { icon: "✅", label: "Resolusi cukup", desc: "Min. 480×640 piksel" },
+                          { icon: "❌", label: "Foto dari sudut ekstrem", desc: "Perspektif distorsi bilah" },
+                          { icon: "❌", label: "Foto bersama banyak benda", desc: "Bisa membingungkan model" },
+                        ].map(({ icon, label, desc }) => (
+                          <div key={label} style={{
+                            background: DARK3, borderRadius: 6, padding: "8px 10px",
+                            display: "flex", gap: 8, alignItems: "flex-start"
+                          }}>
+                            <span style={{ fontSize: 14, flexShrink: 0 }}>{icon}</span>
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: CREAM }}>{label}</div>
+                              <div style={{ fontSize: 10, color: MUTED }}>{desc}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Status model mini */}
+                    {modelInfo && (
+                      <div style={{
+                        background: modelInfo.is_finetuned ? "rgba(46,204,113,0.05)" : "rgba(192,57,43,0.06)",
+                        border: `1px solid ${modelInfo.is_finetuned ? "rgba(46,204,113,0.2)" : "rgba(192,57,43,0.2)"}`,
+                        borderRadius: 6, padding: "8px 12px", fontSize: 10, color: MUTED
+                      }}>
+                        🤖 <b style={{ color: modelInfo.is_finetuned ? GREEN : "#e74c3c" }}>
+                          {modelInfo.is_finetuned ? "Model Fine-tuned Aktif" : "Model Pretrained COCO"}
+                        </b> — {modelInfo.model_file} — {modelInfo.num_classes} kelas
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2116,8 +2316,6 @@ export default function App() {
 
           </div>
         )}
-
-      </main>
 
       {/* Style for Modal Transition */}
       <style>{`

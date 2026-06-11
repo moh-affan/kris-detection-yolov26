@@ -641,13 +641,38 @@ def segment_click(
     return {"status": "success", "box": box, "polygon": None}
 
 
+@app.get("/api/model/info")
+def get_model_info_endpoint():
+    """Kembalikan status model yang sedang aktif (pretrained COCO vs fine-tuned keris)."""
+    return detector.get_model_info()
+
+@app.post("/api/model/reload")
+def reload_model_endpoint():
+    """Paksa reload model (berguna setelah best.pt baru diupload ke server)."""
+    model, path = detector.reload_model()
+    info = detector.get_model_info()
+    return {
+        "status": "reloaded",
+        "model_info": info
+    }
+
 @app.post("/api/detect")
-async def detect_object(file: UploadFile = File(...)):
+async def detect_object(
+    file: UploadFile = File(...),
+    conf_threshold: float = Form(0.15)
+):
     """Run real-time YOLO26 inference and cultural mapping on uploaded image."""
     try:
         contents = await file.read()
-        detections = detector.run_detection(contents)
-        return {"detections": detections}
+        # Clamp threshold ke range yang wajar
+        conf = max(0.05, min(0.95, conf_threshold))
+        detections = detector.run_detection(contents, conf_threshold=conf)
+        model_info = detector.get_model_info()
+        return {
+            "detections": detections,
+            "model_info": model_info,
+            "conf_threshold_used": conf,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
