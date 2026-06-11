@@ -179,6 +179,16 @@ export default function App() {
   const [pagesInput, setPagesInput] = useState(5);
   const logEndRef = useRef(null);
 
+  // --- Dataset Existence State ---
+  const [datasetInfo, setDatasetInfo] = useState({
+    total_images: 0,
+    total_folders: 0,
+    folder_names: [],
+    has_metadata: false,
+    has_dataset: false,
+    loaded: false
+  });
+
   // --- Annotator States ---
   const [images, setImages] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -287,6 +297,7 @@ export default function App() {
   // --- Initialize & Polling Crawler ---
   useEffect(() => {
     fetchCrawlerStatus();
+    fetchDatasetInfo();
     loadImagesList();
     
     // Poll crawler status every 3 seconds
@@ -312,13 +323,37 @@ export default function App() {
     }
   };
 
-  const startCrawler = async () => {
+  const fetchDatasetInfo = async () => {
+    try {
+      const r = await fetch("/api/dataset/info");
+      const d = await r.json();
+      setDatasetInfo({ ...d, loaded: true });
+    } catch (e) {
+      console.error("Error fetching dataset info:", e);
+      setDatasetInfo(prev => ({ ...prev, loaded: true }));
+    }
+  };
+
+  const startCrawler = async (force = false) => {
     try {
       const formData = new FormData();
       formData.append("max_pages", pagesInput);
+      formData.append("force", force ? "true" : "false");
       const r = await fetch("/api/crawler/start", { method: "POST", body: formData });
       const d = await r.json();
+      if (d.status === "dataset_exists") {
+        // Dataset sudah ada, konfirmasi ke user
+        const confirmed = await showConfirm(
+          "⚠️ Dataset Sudah Ada",
+          `Dataset dengan ${d.total_images} gambar sudah ada di sistem.\n\nMelanjutkan crawling akan MENAMBAH gambar baru ke dataset yang sudah ada. Gambar lama tidak akan dihapus, namun data metadata bisa bertambah.\n\nApakah Anda ingin melanjutkan?`
+        );
+        if (confirmed) {
+          await startCrawler(true);
+        }
+        return;
+      }
       fetchCrawlerStatus();
+      fetchDatasetInfo();
     } catch (e) {
       await showAlert("Crawler Gagal", "Gagal memulai crawler: " + e.message);
     }
@@ -873,7 +908,7 @@ export default function App() {
               
               {/* Crawler Controls */}
               <div style={{
-                background: DARK2, border: `1px solid ${GOLD}33`,
+                background: DARK2, border: `1px solid ${datasetInfo.has_dataset ? "#c0392b" : GOLD}33`,
                 borderRadius: 12, padding: 24, display: "flex", flexDirection: "column", gap: 16
               }}>
                 <h3 style={{ fontFamily: "'Cinzel', serif", color: GOLD, margin: "0 0 10px", fontSize: 16 }}>
@@ -883,37 +918,111 @@ export default function App() {
                   Fitur ini melakukan crawling katalog online secara terstruktur untuk mengumpulkan gambar bilah keris, deskripsi, harga, pamor, dan luk awal.
                 </p>
 
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+                {/* Dataset Exists Warning Banner */}
+                {datasetInfo.loaded && datasetInfo.has_dataset && (
+                  <div style={{
+                    background: "rgba(192,57,43,0.12)",
+                    border: "1px solid rgba(192,57,43,0.5)",
+                    borderRadius: 8, padding: "12px 16px",
+                    display: "flex", alignItems: "flex-start", gap: 10
+                  }}>
+                    <span style={{ fontSize: 18, lineHeight: 1 }}>⚠️</span>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#e74c3c", marginBottom: 4 }}>
+                        DATASET SUDAH ADA — CRAWLING DINONAKTIFKAN
+                      </div>
+                      <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
+                        Ditemukan <strong style={{ color: CREAM }}>{datasetInfo.total_images} gambar</strong> dalam{" "}
+                        <strong style={{ color: CREAM }}>{datasetInfo.total_folders} folder</strong> pada dataset yang ada.
+                        Tombol crawling dinonaktifkan untuk melindungi data yang sudah dikumpulkan.
+                        Klik <em style={{ color: GOLD }}>Crawl Tambahan</em> jika ingin menambah gambar baru.
+                      </div>
+                      {datasetInfo.folder_names.length > 0 && (
+                        <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {datasetInfo.folder_names.slice(0, 6).map(f => (
+                            <span key={f} style={{
+                              background: DARK3, border: `1px solid ${GOLD}33`,
+                              borderRadius: 4, padding: "2px 6px", fontSize: 10, color: GOLD
+                            }}>{f}</span>
+                          ))}
+                          {datasetInfo.folder_names.length > 6 && (
+                            <span style={{ fontSize: 10, color: MUTED }}>+{datasetInfo.folder_names.length - 6} lainnya</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 11, color: MUTED }}>BATASAN HALAMAN KATALOG</label>
+                    <label style={{ fontSize: 11, color: datasetInfo.has_dataset ? "#c0392b" : MUTED }}>BATASAN HALAMAN KATALOG</label>
                     <input 
                       type="number" 
                       min="1" max="54" 
                       value={pagesInput} 
                       onChange={e => setPagesInput(parseInt(e.target.value))}
+                      disabled={datasetInfo.has_dataset && crawlerStatus.status !== "running"}
                       style={{
-                        background: DARK3, border: `1px solid ${GOLD}44`,
-                        borderRadius: 6, padding: "8px 12px", color: CREAM,
-                        fontSize: 14, outline: "none", width: 140
+                        background: datasetInfo.has_dataset ? "#1a0000" : DARK3,
+                        border: `1px solid ${datasetInfo.has_dataset ? "rgba(192,57,43,0.4)" : GOLD + "44"}`,
+                        borderRadius: 6, padding: "8px 12px",
+                        color: datasetInfo.has_dataset ? MUTED : CREAM,
+                        fontSize: 14, outline: "none", width: 140,
+                        cursor: datasetInfo.has_dataset ? "not-allowed" : "text"
                       }}
                     />
                   </div>
                   
-                  <button
-                    onClick={startCrawler}
-                    disabled={crawlerStatus.status === "running"}
-                    style={{
-                      background: crawlerStatus.status === "running" ? "#333" : GOLD,
-                      color: crawlerStatus.status === "running" ? MUTED : DARK,
-                      border: "none", borderRadius: 6, padding: "10px 20px",
-                      cursor: crawlerStatus.status === "running" ? "default" : "pointer",
-                      fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 8,
-                      alignSelf: "flex-end", height: 38
-                    }}
-                  >
-                    <Play size={14} fill={crawlerStatus.status === "running" ? "none" : DARK} />
-                    Mulai Crawling
-                  </button>
+                  {/* Tombol utama: DISABLED jika dataset ada */}
+                  {!datasetInfo.has_dataset ? (
+                    <button
+                      onClick={() => startCrawler(false)}
+                      disabled={crawlerStatus.status === "running"}
+                      style={{
+                        background: crawlerStatus.status === "running" ? "#333" : GOLD,
+                        color: crawlerStatus.status === "running" ? MUTED : DARK,
+                        border: "none", borderRadius: 6, padding: "10px 20px",
+                        cursor: crawlerStatus.status === "running" ? "default" : "pointer",
+                        fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 8,
+                        alignSelf: "flex-end", height: 38
+                      }}
+                    >
+                      <Play size={14} fill={crawlerStatus.status === "running" ? "none" : DARK} />
+                      Mulai Crawling
+                    </button>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, alignSelf: "flex-end" }}>
+                      <button
+                        disabled
+                        title="Dataset sudah ada. Gunakan tombol Crawl Tambahan untuk menambah data."
+                        style={{
+                          background: "#1a0000", color: "rgba(192,57,43,0.5)",
+                          border: "1px solid rgba(192,57,43,0.25)", borderRadius: 6,
+                          padding: "10px 20px", cursor: "not-allowed",
+                          fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 8,
+                          height: 38
+                        }}
+                      >
+                        <Play size={14} fill="none" />
+                        Mulai Crawling
+                      </button>
+                      <button
+                        onClick={() => startCrawler(false)}
+                        disabled={crawlerStatus.status === "running"}
+                        title="Tambah gambar baru ke dataset yang sudah ada (memerlukan konfirmasi)"
+                        style={{
+                          background: crawlerStatus.status === "running" ? "#333" : "rgba(192,57,43,0.2)",
+                          color: crawlerStatus.status === "running" ? MUTED : "#e74c3c",
+                          border: "1px solid rgba(192,57,43,0.5)", borderRadius: 6,
+                          padding: "6px 12px", cursor: crawlerStatus.status === "running" ? "default" : "pointer",
+                          fontWeight: 700, fontSize: 11, display: "flex", alignItems: "center", gap: 6
+                        }}
+                      >
+                        ⚠️ Crawl Tambahan
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Status Bar */}

@@ -84,8 +84,52 @@ class SaveAnnotationRequest(BaseModel):
 def get_crawler_status():
     return crawler.crawler_state
 
+@app.get("/api/dataset/info")
+def get_dataset_info():
+    """Return info about existing dataset to prevent accidental re-crawling."""
+    total_images = 0
+    total_folders = 0
+    folder_names = []
+
+    if os.path.exists(IMAGES_DIR):
+        for entry in os.scandir(IMAGES_DIR):
+            if entry.is_dir():
+                count = sum(
+                    1 for f in os.scandir(entry.path)
+                    if f.is_file() and f.name.lower().endswith(('.jpg', '.jpeg', '.png'))
+                )
+                if count > 0:
+                    total_folders += 1
+                    total_images += count
+                    folder_names.append(entry.name)
+
+    has_metadata = os.path.exists(os.path.join(METADATA_DIR, "checkpoint.json")) or \
+                   os.path.exists(os.path.join(METADATA_DIR, "dataset_keris_metadata.json"))
+
+    return {
+        "total_images": total_images,
+        "total_folders": total_folders,
+        "folder_names": folder_names,
+        "has_metadata": has_metadata,
+        "has_dataset": total_images > 0
+    }
+
 @app.post("/api/crawler/start")
-def start_crawler_endpoint(max_pages: int = Form(5)):
+def start_crawler_endpoint(max_pages: int = Form(5), force: bool = Form(False)):
+    """Start the crawler. If dataset already exists, requires force=True to proceed."""
+    # Check if dataset already exists and force is not set
+    if not force and os.path.exists(IMAGES_DIR):
+        total_images = sum(
+            1 for root, _, files in os.walk(IMAGES_DIR)
+            for f in files if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+        )
+        if total_images > 0:
+            return {
+                "status": "dataset_exists",
+                "message": f"Dataset sudah ada ({total_images} gambar). Gunakan force=true untuk crawling ulang.",
+                "total_images": total_images
+            }
+
     success = crawler.start_crawler(max_pages, OUTPUT_DIR)
     if success:
         return {"status": "started", "message": f"Crawler started scanning {max_pages} pages."}
