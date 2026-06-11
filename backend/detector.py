@@ -329,33 +329,24 @@ def run_detection(image_path_or_bytes, conf_threshold: float = 0.15, kb_path=Non
             })
 
     # Jika model COCO dan 0 proxy terdeteksi, coba deteksi seluruh objek sebagai fallback
-    # lalu ambil yang confidence tertinggi sebagai kandidat keris
+    # lalu masukkan semua objek tersebut sebagai kandidat keris_unknown
     if not detections and not is_finetuned:
         results_any = model.predict(img_bgr, conf=0.05, iou=0.45, verbose=False)
-        best_conf   = 0.0
-        best_box    = None
-        best_name   = "unknown"
-
         for r in results_any:
             for box in (r.boxes or []):
                 c = float(box.conf[0].item())
-                if c > best_conf:
-                    best_conf = c
-                    best_box  = box
-                    best_name = r.names.get(int(box.cls[0].item()), "unknown")
-
-        if best_box is not None:
-            x1, y1, x2, y2 = best_box.xyxy[0].tolist()
-            detections.append({
-                "bbox": {
-                    "x": x1/w, "y": y1/h,
-                    "w": (x2-x1)/w, "h": (y2-y1)/h
-                },
-                "confidence":    best_conf,
-                "label":         "keris_unknown",
-                "raw_coco_name": best_name,
-                "is_proxy":      True,
-                "cultural_meta": get_keris_cultural_metadata("keris_unknown", best_conf, kb_path),
-            })
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                name = r.names.get(int(box.cls[0].item()), "unknown")
+                detections.append({
+                    "bbox": {
+                        "x": x1/w, "y": y1/h,
+                        "w": (x2-x1)/w, "h": (y2-y1)/h
+                    },
+                    "confidence":    c,
+                    "label":         "keris_unknown",
+                    "raw_coco_name": name,
+                    "is_proxy":      True,
+                    "cultural_meta": get_keris_cultural_metadata("keris_unknown", c, kb_path),
+                })
 
     return detections
