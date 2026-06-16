@@ -161,7 +161,7 @@ def load_yolo_model():
 
     try:
         import torch
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cuda" if torch.cuda.is_available() else "cpu" # type: ignore
     except Exception:
         device = "cpu"
 
@@ -218,7 +218,7 @@ def load_sam_model():
 
     try:
         import torch
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cuda" if torch.cuda.is_available() else "cpu" # type: ignore
     except Exception:
         device = "cpu"
 
@@ -321,7 +321,7 @@ def run_sam_segmentation(image_path):
     # 1 inference, tanpa prompt → segment everything
     try:
         import torch
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cuda" if torch.cuda.is_available() else "cpu"  # type: ignore
     except Exception:
         device = "cpu"
 
@@ -540,9 +540,12 @@ def run_detection(image_path_or_bytes, conf_threshold: float = 0.15, kb_path=Non
     info     = get_model_info()
     is_finetuned = info["is_finetuned"]
 
+    # Turunkan threshold lebih lagi untuk pretrained COCO (agar proxy tetap muncul)
+    effective_conf = conf_threshold if is_finetuned else min(conf_threshold, 0.10)
+
     try:
         import torch
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cuda" if torch.cuda.is_available() else "cpu"  # type: ignore
     except Exception:
         device = "cpu"
 
