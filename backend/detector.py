@@ -16,6 +16,12 @@ _dynamic_class_map = None  # {class_name: kb_meta} dibaca dari annotations_db
 SAM_MIN_AREA_FRAC = 0.02
 # NMS dedup: dua mask dengan IoU bbox > ambang ini dianggap duplikat → simpan yg lebih besar
 SAM_NMS_IOU       = 0.70
+# Eliminasi background: buang mask yang area-nya > ambang ini (fraksi area gambar)
+SAM_BG_MAX_AREA_FRAC = 0.85
+# Eliminasi background: buang mask yang menyentuh >= ambang ini dari 4 sisi gambar
+SAM_BG_MIN_BORDER_TOUCH = 3
+# Dedup nesting: mask yang >ambang ini terkandung dalam mask lain → buang (sisanya duplikat)
+SAM_CONTAINMENT_FRAC = 0.90
 # Path SAM model (mobile_sam.pt ringan ~40MB, cocok CPU)
 _SAM_MODEL_PATH   = os.path.join(os.path.dirname(os.path.dirname(__file__)), "mobile_sam.pt")
 
@@ -228,10 +234,45 @@ def _bbox_iou(a, b):
     return inter / union if union > 0 else 0.0
 
 
+def _mask_border_touches(mask_bool):
+    """Hitung berapa dari 4 sisi gambar (atas/bawah/kiri/kanan) yang dilewati mask.
+
+    Mask raster boolean (HxW). 'Dilewati' = ada pixel True di baris/kolom tepi.
+    Objek foreground hampir tak pernah menyentuh banyak sisi; background hampir
+    selalu menyentuh 2-4 sisi (lantai/dinding/kain menyebar ke pinggir foto).
+    """
+    top    = bool(mask_bool[0, :].any())
+    bottom = bool(mask_bool[-1, :].any())
+    left   = bool(mask_bool[:, 0].any())
+    right  = bool(mask_bool[:, -1].any())
+    return int(top) + int(bottom) + int(left) + int(right)
+
+
+def _mask_containment(inner_bool, outer_bool):
+    """Fraksi pixel inner yang juga termasuk outer (intersection / inner area).
+
+    Dipakai untuk dedup mask bertingkat/bersarang khas SAM (mis. bilah utuh vs
+    bagian daun/gagang yang sebagian besar tumpang-tindih).
+    """
+    inner_sum = int(inner_bool.sum())
+    if inner_sum == 0:
+        return 0.0
+    return float(np.logical_and(inner_bool, outer_bool).sum()) / float(inner_sum)
+
+
 def run_sam_segmentation(image_path):
     """
     Jalankan SAM "segment everything" (predict tanpa prompt) untuk menandai
-    semua objek dalam gambar secara class-agnostic.
+    semua objek dalam gambar secara class-agnostic, dengan eliminasi background
+    dan dedup mask bertingkat.
+
+    Filter yang diterapkan (berurutan):
+      1. area terlalu kecil        (< SAM_MIN_AREA_FRAC)
+      2. background                (area > SAM_BG_MAX_AREA_FRAC ATAU
+                                    menyentuh >= SAM_BG_MIN_BORDER_TOUCH sisi)
+      3. NMS duplikat tumpang-tindih (IoU bbox > SAM_NMS_IOU)
+      4. containment nesting       (> SAM_CONTAINMENT_FRAC pixel terkandung
+                                    dalam mask lain → buang)
 
     Returns: list of dict, diurutkan area menurun:
         [{
@@ -261,12 +302,25 @@ def run_sam_segmentation(image_path):
         print(f"[detector] SAM predict gagal (no-prompt): {e}")
         return []
 
-    if not results or results[0].masks is None or results[0].masks.xy is None:
+    res0 = results[0] if results else None
+    if res0 is None or res0.masks is None or res0.masks.xy is None:
         return []
+
+    # Raster mask untuk border-touch & containment. masks.data: torch tensor (N,H,W)
+    masks_bool = None
+    try:
+        md = res0.masks.data
+        # md bisa torch.Tensor → konversi ke numpy dulu sebelum astype
+        if hasattr(md, "cpu"):
+            md = md.cpu().numpy()
+        md = np.asarray(md)
+        masks_bool = md.astype(bool)
+    except Exception as e:
+        print(f"[detector] SAM masks.data tidak terbaca (border/containment skip): {e}")
 
     # Kumpulkan kandidat mask
     candidates = []
-    for mask_pts in results[0].masks.xy:
+    for idx, mask_pts in enumerate(res0.masks.xy):
         if mask_pts is None or len(mask_pts) < 5:
             continue
         pts = mask_pts.astype(np.float32)
@@ -279,8 +333,24 @@ def run_sam_segmentation(image_path):
         bh = max_y - min_y
         area_frac = (bw * bh) / img_area if img_area > 0 else 0.0
 
-        # Filter area terlalu kecil
+        # (1) Filter area terlalu kecil
         if area_frac < SAM_MIN_AREA_FRAC:
+            continue
+
+        # Raster mask untuk kandidat ini (jika tersedia)
+        cand_mask = None
+        if masks_bool is not None and idx < masks_bool.shape[0]:
+            cand_mask = masks_bool[idx]
+
+        # (2) Filter background:
+        #   (2a) area sangat besar (mendekati seluruh gambar)
+        #   (2b) menyentuh banyak tepi gambar (border-touch)
+        is_bg = False
+        if area_frac > SAM_BG_MAX_AREA_FRAC:
+            is_bg = True
+        elif cand_mask is not None and _mask_border_touches(cand_mask) >= SAM_BG_MIN_BORDER_TOUCH:
+            is_bg = True
+        if is_bg:
             continue
 
         # Simplify polygon (kurangi payload jaringan)
@@ -299,15 +369,31 @@ def run_sam_segmentation(image_path):
             },
             "polygon":   polygon,
             "area_frac": area_frac,
+            "_mask":     cand_mask,
         })
 
-    # Sort menurun berdasar area → NMS dedup simpan yang lebih besar
+    # Sort menurun berdasar area: (3) NMS dedup + (4) containment dedup.
+    # Iterasi dari terbesar → simpan jika tidak tumpang-tindih/terkandung dlm kept.
     candidates.sort(key=lambda c: c["area_frac"], reverse=True)
     kept = []
     for cand in candidates:
-        if all(_bbox_iou(cand["bbox"], k["bbox"]) <= SAM_NMS_IOU for k in kept):
+        dup = False
+        for k in kept:
+            # (3) NMS tumpang-tindih berdasar IoU bbox
+            if _bbox_iou(cand["bbox"], k["bbox"]) > SAM_NMS_IOU:
+                dup = True
+                break
+            # (4) Containment: cand terkandung dalam k (>90% pixel cand ada di k)
+            if (cand["_mask"] is not None and k["_mask"] is not None
+                    and _mask_containment(cand["_mask"], k["_mask"]) > SAM_CONTAINMENT_FRAC):
+                dup = True
+                break
+        if not dup:
             kept.append(cand)
 
+    # Bersihkan field internal sebelum return
+    for c in kept:
+        c.pop("_mask", None)
     return kept
 
 
