@@ -1172,20 +1172,27 @@ export default function App() {
                   DAFTAR GAMBAR
                 </span>
                 <div style={{ display: "flex", gap: 4 }}>
-                  {["all", "pending", "done"].map(st => (
-                    <button
-                      key={st}
-                      onClick={() => setFilterStatus(st)}
-                      style={{
-                        background: filterStatus === st ? GOLD : DARK3,
-                        color: filterStatus === st ? DARK : MUTED,
-                        border: "none", borderRadius: 4, padding: "2px 6px",
-                        fontSize: 9, cursor: "pointer", fontWeight: 700
-                      }}
-                    >
-                      {st.toUpperCase()}
-                    </button>
-                  ))}
+                  {["all", "pending", "done"].map(st => {
+                    const count = st === "all" 
+                      ? images.length 
+                      : st === "pending" 
+                        ? images.filter(img => img.status === "pending").length 
+                        : images.filter(img => img.status === "done" || img.status === "skip").length;
+                    return (
+                      <button
+                        key={st}
+                        onClick={() => setFilterStatus(st)}
+                        style={{
+                          background: filterStatus === st ? GOLD : DARK3,
+                          color: filterStatus === st ? DARK : MUTED,
+                          border: "none", borderRadius: 4, padding: "2px 6px",
+                          fontSize: 9, cursor: "pointer", fontWeight: 700
+                        }}
+                      >
+                        {st.toUpperCase()} ({count})
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
