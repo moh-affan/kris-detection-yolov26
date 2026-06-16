@@ -159,6 +159,12 @@ def load_yolo_model():
     if _model_instance is not None:
         return _model_instance, _model_path_used
 
+    try:
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    except Exception:
+        device = "cpu"
+
     for path in _candidate_model_paths():
         try:
             if not os.path.exists(path) and "/" not in path and "\\" not in path:
@@ -168,9 +174,15 @@ def load_yolo_model():
                 m = YOLO(path)
             else:
                 continue
+            
+            if device == "cuda":
+                m.to(device)
+                print(f"[detector] YOLO Model loaded and moved to GPU ({device}): {path}")
+            else:
+                print(f"[detector] YOLO Model loaded on CPU: {path}")
+
             _model_instance  = m
             _model_path_used = path
-            print(f"[detector] Model loaded: {path}")
             return _model_instance, _model_path_used
         except Exception as e:
             print(f"[detector] Failed to load {path}: {e}")
@@ -205,8 +217,19 @@ def load_sam_model():
         return None, None
 
     try:
-        _sam_model_instance = SAM(_SAM_MODEL_PATH)
-        print(f"[detector] SAM loaded: {_SAM_MODEL_PATH}")
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    except Exception:
+        device = "cpu"
+
+    try:
+        model = SAM(_SAM_MODEL_PATH)
+        if device == "cuda":
+            model.to(device)
+            print(f"[detector] SAM loaded and moved to GPU ({device}): {_SAM_MODEL_PATH}")
+        else:
+            print(f"[detector] SAM loaded on CPU: {_SAM_MODEL_PATH}")
+        _sam_model_instance = model
     except Exception as e:
         print(f"[detector] Gagal load SAM: {e}")
         _sam_model_instance = None
@@ -297,7 +320,13 @@ def run_sam_segmentation(image_path):
 
     # 1 inference, tanpa prompt → segment everything
     try:
-        results = model.predict(source=img_bgr, verbose=False)
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    except Exception:
+        device = "cpu"
+
+    try:
+        results = model.predict(source=img_bgr, device=device, verbose=False)
     except Exception as e:
         print(f"[detector] SAM predict gagal (no-prompt): {e}")
         return []
@@ -511,10 +540,13 @@ def run_detection(image_path_or_bytes, conf_threshold: float = 0.15, kb_path=Non
     info     = get_model_info()
     is_finetuned = info["is_finetuned"]
 
-    # Turunkan threshold lebih lagi untuk pretrained COCO (agar proxy tetap muncul)
-    effective_conf = conf_threshold if is_finetuned else min(conf_threshold, 0.10)
+    try:
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    except Exception:
+        device = "cpu"
 
-    results    = model.predict(img_bgr, conf=effective_conf, iou=0.45, verbose=False)
+    results    = model.predict(img_bgr, conf=effective_conf, iou=0.45, device=device, verbose=False)
     detections = []
 
     for r in results:
@@ -556,7 +588,7 @@ def run_detection(image_path_or_bytes, conf_threshold: float = 0.15, kb_path=Non
     # Jika model COCO dan 0 proxy terdeteksi, coba deteksi seluruh objek sebagai fallback
     # lalu masukkan semua objek tersebut sebagai kandidat keris_unknown
     if not detections and not is_finetuned:
-        results_any = model.predict(img_bgr, conf=0.05, iou=0.45, verbose=False)
+        results_any = model.predict(img_bgr, conf=0.05, iou=0.45, device=device, verbose=False)
         for r in results_any:
             for box in (r.boxes or []):
                 c = float(box.conf[0].item())

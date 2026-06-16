@@ -484,7 +484,12 @@ def segment_click(
     try:
         # Pakai singleton yang sama dengan pre-annotate (hemat memori/load 40MB model)
         sam_model, _ = detector.load_sam_model()
-        sam_results = sam_model.predict(source=img, points=[[px, py]], labels=[1], verbose=False)
+        try:
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        except Exception:
+            device = "cpu"
+        sam_results = sam_model.predict(source=img, points=[[px, py]], labels=[1], device=device, verbose=False)
         if sam_results and sam_results[0].masks is not None and len(sam_results[0].masks.xy) > 0:
             mask_pts = sam_results[0].masks.xy[0]
             if len(mask_pts) > 5:
