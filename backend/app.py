@@ -390,42 +390,39 @@ def extract_metadata_with_gemini(req: GeminiExtractRequest):
 
 @app.post("/api/ai-suggest")
 def ai_suggest(filename: str = Form(...), class_folder: str = Form(...)):
-    """Local offline suggestion: check filename clues, and run YOLO26 detector on the file."""
-    # 1. Parse clues from filename
+    """Local offline suggestion: parse filename clues, lalu SAM "segment everything"
+    untuk menandai semua objek (class-agnostic) — bukan YOLO/COCO lagi."""
+    # 1. Parse clues from filename (dapur/pamor/tangguh/luk dari nama file sangat akurat)
     meta = crawler.parse_product_page(
         filename, 
         BeautifulSoup(f"<h1>{filename}</h1>", 'html.parser')
     )
     
-    # 2. Run local detector to see if we can find exact coordinates
+    # 2. Jalankan SAM segment-everything pada file
     full_path = os.path.join(IMAGES_DIR, class_folder, filename)
     boxes = []
     
     if os.path.exists(full_path):
-        detections = detector.run_detection(full_path)
-        for idx, det in enumerate(detections):
-            # Map detection results back to box list
-            c_meta = det["cultural_meta"]
-            
-            # Map COCO labels (like knife, person, tie) to the custom keris label parsed from filename/folder
-            assigned_label = det["label"] if det["label"].startswith("keris_") else (meta["label_yolo"] or "keris_unknown")
-            
-            # Combine coordinates from detector with filename clues (which are highly accurate for dapur/pamor/luk)
+        segments = detector.run_sam_segmentation(full_path)
+        for idx, seg in enumerate(segments):
+            # Tiap segmen → satu box dengan polygon + bbox.
+            # Label/metadata tetap dari clue filename (ortogonal terhadap metode deteksi).
             boxes.append({
                 "id": float(1000 + idx),
-                "x": det["bbox"]["x"],
-                "y": det["bbox"]["y"],
-                "w": det["bbox"]["w"],
-                "h": det["bbox"]["h"],
-                "label": assigned_label,
-                "dhapur": meta["dhapur"] or c_meta.get("dapur", {}).get("nama", "") or "",
-                "pamor": meta["pamor"] or c_meta.get("pamor", {}).get("nama", "") or "",
-                "tangguh": meta["tangguh"] or c_meta.get("tangguh", {}).get("nama", "") or "",
-                "luk": meta["luk"] if meta["luk"] is not None else c_meta.get("luk_count", None),
+                "x": seg["bbox"]["x"],
+                "y": seg["bbox"]["y"],
+                "w": seg["bbox"]["w"],
+                "h": seg["bbox"]["h"],
+                "polygon": seg["polygon"],
+                "label": meta["label_yolo"] or "keris_unknown",
+                "dhapur": meta["dhapur"] or "",
+                "pamor": meta["pamor"] or "",
+                "tangguh": meta["tangguh"] or "",
+                "luk": meta["luk"],
                 "confirmed": False
             })
 
-    # If YOLO didn't find boxes, create a default candidate box covering most of the image
+    # Jika SAM menemukan 0 objek (sangat jarang), buat kotak default menutupi sebagian gambar
     if not boxes:
         boxes.append({
             "id": float(1000),
@@ -433,6 +430,7 @@ def ai_suggest(filename: str = Form(...), class_folder: str = Form(...)):
             "y": 0.1,
             "w": 0.6,
             "h": 0.8,
+            "polygon": None,
             "label": meta["label_yolo"] or "keris_unknown",
             "dhapur": meta["dhapur"] or "",
             "pamor": meta["pamor"] or "",
@@ -484,9 +482,8 @@ def segment_click(
 
     # LEVEL 0: Segment Anything Model (SAM) - highly precise, deep-learning based zero-shot segmentation
     try:
-        from ultralytics import SAM
-        # Load mobile_sam.pt (only 40MB, lightweight, works great on CPU)
-        sam_model = SAM('mobile_sam.pt')
+        # Pakai singleton yang sama dengan pre-annotate (hemat memori/load 40MB model)
+        sam_model, _ = detector.load_sam_model()
         sam_results = sam_model.predict(source=img, points=[[px, py]], labels=[1], verbose=False)
         if sam_results and sam_results[0].masks is not None and len(sam_results[0].masks.xy) > 0:
             mask_pts = sam_results[0].masks.xy[0]

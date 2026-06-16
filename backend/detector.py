@@ -2,13 +2,22 @@ import os
 import json
 import cv2
 import numpy as np
-from ultralytics import YOLO
+from ultralytics import YOLO, SAM
 
 # ── Global singletons ─────────────────────────────────────────────────────────
 _model_instance   = None
 _model_path_used  = None
+_sam_model_instance = None    # cache SAM (mobile_sam.pt) untuk segment-everything & klik
 _knowledge_base   = None
 _dynamic_class_map = None  # {class_name: kb_meta} dibaca dari annotations_db
+
+# ── Konfigurasi SAM segment-everything (pre-annotate) ─────────────────────────
+# Filter mask: buang yang lebih kecil dari ambang ini (fraksi area gambar)
+SAM_MIN_AREA_FRAC = 0.02
+# NMS dedup: dua mask dengan IoU bbox > ambang ini dianggap duplikat → simpan yg lebih besar
+SAM_NMS_IOU       = 0.70
+# Path SAM model (mobile_sam.pt ringan ~40MB, cocok CPU)
+_SAM_MODEL_PATH   = os.path.join(os.path.dirname(os.path.dirname(__file__)), "mobile_sam.pt")
 
 # ── COCO class ID → keris proxy mapping ───────────────────────────────────────
 # Objek COCO yang secara visual mirip bilah/benda panjang ramping
@@ -88,7 +97,7 @@ def _build_dynamic_class_map(kb):
             0:  "tilam_upih", 3: "carita", 5: "carita",
             7:  "jalak",      9: "sabuk_inten", 13: "sengkelat"
         }
-        dapur_key = dapur_by_luk.get(luk_count, "jalak")
+        dapur_key = dapur_by_luk.get(luk_count, "jalak") # type: ignore
 
         dapur    = kb.get("dapur",   {}).get(dapur_key, {})
         pamor    = kb.get("pamor",   {}).get("beras_wutah", {})
@@ -172,6 +181,136 @@ def reload_model():
     return load_yolo_model()
 
 
+# ── SAM (Segment Anything Model) loading ──────────────────────────────────────
+def load_sam_model():
+    """
+    Muat & cache singleton SAM (mobile_sam.pt). Dipakai bersama oleh pre-annotate
+    (segment-everything) dan klik-segmentasi (/api/segment-click) agar tidak
+    me-load model 40MB berulang-ulang.
+
+    Returns: (model, path) atau (None, None) bila gagal.
+    """
+    global _sam_model_instance
+    if _sam_model_instance is not None:
+        return _sam_model_instance, _SAM_MODEL_PATH
+
+    if not os.path.exists(_SAM_MODEL_PATH):
+        print(f"[detector] SAM model tidak ditemukan: {_SAM_MODEL_PATH}")
+        return None, None
+
+    try:
+        _sam_model_instance = SAM(_SAM_MODEL_PATH)
+        print(f"[detector] SAM loaded: {_SAM_MODEL_PATH}")
+    except Exception as e:
+        print(f"[detector] Gagal load SAM: {e}")
+        _sam_model_instance = None
+        return None, None
+
+    return _sam_model_instance, _SAM_MODEL_PATH
+
+
+def reload_sam_model():
+    """Paksa reload SAM singleton."""
+    global _sam_model_instance
+    _sam_model_instance = None
+    return load_sam_model()
+
+
+def _bbox_iou(a, b):
+    """IoU dua bbox (x,y,w,h)."""
+    ax2, ay2 = a["x"] + a["w"], a["y"] + a["h"]
+    bx2, by2 = b["x"] + b["w"], b["y"] + b["h"]
+    ix1, iy1 = max(a["x"], b["x"]), max(a["y"], b["y"])
+    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+    iw, ih = max(0.0, ix2 - ix1), max(0.0, iy2 - iy1)
+    inter = iw * ih
+    union = a["w"] * a["h"] + b["w"] * b["h"] - inter
+    return inter / union if union > 0 else 0.0
+
+
+def run_sam_segmentation(image_path):
+    """
+    Jalankan SAM "segment everything" (predict tanpa prompt) untuk menandai
+    semua objek dalam gambar secara class-agnostic.
+
+    Returns: list of dict, diurutkan area menurun:
+        [{
+            "bbox":      {"x","y","w","h"},   # normalized 0-1
+            "polygon":   [[x,y], ...],         # normalized 0-1, sudah disimplify
+            "area_frac": float                 # fraksi area gambar
+        }, ...]
+    """
+    model, _ = load_sam_model()
+    if model is None:
+        return []
+
+    img_bgr = cv2.imread(image_path) if isinstance(image_path, str) else None
+    if isinstance(image_path, (bytes, bytearray)):
+        img_bgr = cv2.imdecode(np.frombuffer(image_path, np.uint8), cv2.IMREAD_COLOR)
+    if img_bgr is None:
+        print("[detector] run_sam_segmentation: gambar tidak terbaca.")
+        return []
+
+    h, w = img_bgr.shape[:2]
+    img_area = float(h * w)
+
+    # 1 inference, tanpa prompt → segment everything
+    try:
+        results = model.predict(source=img_bgr, verbose=False)
+    except Exception as e:
+        print(f"[detector] SAM predict gagal (no-prompt): {e}")
+        return []
+
+    if not results or results[0].masks is None or results[0].masks.xy is None:
+        return []
+
+    # Kumpulkan kandidat mask
+    candidates = []
+    for mask_pts in results[0].masks.xy:
+        if mask_pts is None or len(mask_pts) < 5:
+            continue
+        pts = mask_pts.astype(np.float32)
+
+        # bbox dari ekstrem polygon
+        xs, ys = pts[:, 0], pts[:, 1]
+        min_x, max_x = float(np.min(xs)), float(np.max(xs))
+        min_y, max_y = float(np.min(ys)), float(np.max(ys))
+        bw = max_x - min_x
+        bh = max_y - min_y
+        area_frac = (bw * bh) / img_area if img_area > 0 else 0.0
+
+        # Filter area terlalu kecil
+        if area_frac < SAM_MIN_AREA_FRAC:
+            continue
+
+        # Simplify polygon (kurangi payload jaringan)
+        epsilon = 0.003 * cv2.arcLength(pts.astype(np.int32), True)
+        approx = cv2.approxPolyDP(pts.astype(np.int32), epsilon, True)
+        polygon = [[float(p[0][0] / w), float(p[0][1] / h)] for p in approx]
+        if len(polygon) < 3:
+            continue
+
+        candidates.append({
+            "bbox": {
+                "x": min_x / w,
+                "y": min_y / h,
+                "w": bw / w,
+                "h": bh / h,
+            },
+            "polygon":   polygon,
+            "area_frac": area_frac,
+        })
+
+    # Sort menurun berdasar area → NMS dedup simpan yang lebih besar
+    candidates.sort(key=lambda c: c["area_frac"], reverse=True)
+    kept = []
+    for cand in candidates:
+        if all(_bbox_iou(cand["bbox"], k["bbox"]) <= SAM_NMS_IOU for k in kept):
+            kept.append(cand)
+
+    return kept
+
+
 # ── Model info ────────────────────────────────────────────────────────────────
 def get_model_info():
     """Kembalikan informasi model yang aktif untuk ditampilkan di frontend."""
@@ -196,7 +335,7 @@ def get_model_info():
         message = f"Model fine-tuned keris aktif — {len(class_names)} kelas dikenali."
     elif "best.pt" in (path or ""):
         status  = "finetuned_keris"
-        message = f"Model fine-tuned aktif ({os.path.basename(path)})."
+        message = f"Model fine-tuned aktif ({os.path.basename(path)})." # type: ignore
         is_finetuned = True
     else:
         status  = "pretrained_coco"
@@ -248,7 +387,7 @@ def get_keris_cultural_metadata(detected_class: str, confidence: float, kb_path=
 
     return {
         "kelas_terdeteksi": detected_class,
-        "confidence":       float(confidence),
+        "confidence":       confidence,
         "status_budaya":    kb.get("status_budaya", {}),
         **meta,
     }
