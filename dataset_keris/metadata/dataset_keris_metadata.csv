@@ -253,3 +253,65 @@
 0098_Keris_Jalak_Sangu_Tumpeng_Madiun_0_28b01e.jpg,keris_lurus,0,0.6070,0.4710,0.1960,0.8320,keris_lurus,Jalak Sangu Tumpeng,,Madiun,0,yes
 0298_Keris_Tilam_Upih_Pamor_Tambal_Sepuh_0_d350c8.jpg,keris_lurus,0,0.6685,0.4004,0.1533,0.6621,keris_lurus,Tilam Upih,Tambal,,0,yes
 0294_Keris_Tilam_Upih_Pamor_Melati_Tumpuk_0_e6e2b7.jpg,keris_lurus,0,0.4868,0.5059,0.5342,0.8418,keris_lurus,Tilam Upih,,,0,yes
+0210_Keris_Patrem_Kebo_Lajer_Tangguh_Pajajaran_Ori_Sepu_0_c9bd82.jpg,keris_lurus,0,0.4844,0.5103,0.6075,0.7469,keris_lurus,Kebo Lajer,Ngulit Semangka,Pajajaran,0,yes
+0170_Keris_Pamor_Ron_Genduru_Sinebit_Winengku_0_afb23c.jpg,keris_lurus,0,0.4736,0.4590,0.5859,0.8652,keris_lurus,Jalak Ngore,Ron Genduru,,0,yes
+0170_Keris_Pamor_Ron_Genduru_Sinebit_Winengku_0_afb23c.jpg,keris_lurus,1,0.5000,0.5708,0.9668,0.2920,keris_unknown,,Ron Genduru,,,no
+0161_Keris_Pamengkang_Jagad_Pamor_Pandito_Bolo_Pandito_0_4a9fb7.jpg,keris_lurus,0,0.5033,0.4848,0.9645,0.6031,keris_lurus,Brojol,,Tuban,0,yes
+0161_Keris_Pamengkang_Jagad_Pamor_Pandito_Bolo_Pandito_0_4a9fb7.jpg,keris_lurus,1,0.5090,0.5369,0.9547,0.1137,keris_unknown,,,,,no
+0287_Keris_Tilam_Upih_Pamor_Bendo_Segodo_Sepuh_0_c11254.jpg,keris_lurus,0,0.6509,0.3838,0.1768,0.5859,keris_lurus,Tilam Upih,Bendo Segodo,,0,yes
+0184_Keris_Panimbal_Majapahit_Gonjo_Wilut_0_e54244.jpg,keris_panimbal_,0,0.6539,0.3904,0.1172,0.6582,keris_luk_9,Panimbal,,Majapahit,9,yes
+0182_Keris_Panimbal_Kinatah_Emas_Pamor_Untu_Walang_0_df537b.jpg,keris_panimbal_,0,0.5200,0.4922,0.4697,0.8398,keris_luk_9,Panimbal,Untu Walang,,9,yes
+0182_Keris_Panimbal_Kinatah_Emas_Pamor_Untu_Walang_0_df537b.jpg,keris_panimbal_,1,0.4238,0.4785,0.3066,0.8379,keris_panimbal_,Panimbal,Untu Walang,,,no
+0187_Keris_Panji_Nom_Mataram_Amangkurat_0_62c323.jpg,keris_mangkurat_,0,0.6519,0.4917,0.1846,0.9014,keris_lurus,Mangkurat,,Mataram Amangkurat,0,yes
+0140_Keris_Mangkurat_Pamor_Pedaringan_Kebak_0_f3a5b1.jpg,keris_mangkurat_,0,0.6748,0.5190,0.1523,0.8564,keris_lurus,Mangkurat,Pedaringan Kebak,,0,yes
+0126_Keris_Korowelang_Mataram_Amangkurat_0_d389d0.jpg,keris_mangkurat_,0,0.4497,0.4741,0.4775,0.8838,keris_luk_13,Mangkurat,,Mataram Amangkurat,13,yes
+0126_Keris_Korowelang_Mataram_Amangkurat_0_d389d0.jpg,keris_mangkurat_,1,0.6855,0.4805,0.2129,0.8555,keris_mangkurat_,Mangkurat,,Mataram Amangkurat,,no
+0126_Keris_Korowelang_Mataram_Amangkurat_0_d389d0.jpg,keris_mangkurat_,2,0.6689,0.8042,0.0977,0.2158,keris_mangkurat_,Mangkurat,,Mataram Amangkurat,,no
+0271_Keris_Sinom_Kinatah_Emas_Mataram_Amangkurat_0_816dcb.jpg,keris_mangkurat_,0,0.6353,0.5186,0.1963,0.8223,keris_lurus,Mangkurat,,Mataram Amangkurat,0,yes
+0145_Keris_Murma_Malela_Mataram_Amangkurat_0_7515ae.jpg,keris_mangkurat_,0,0.6271,0.4818,0.1730,0.8613,keris_luk_7,Mangkurat,,Mataram Amangkurat,7,yes
+0196_Keris_Parungsari_Sinebaning_Dilah_0_b1e79f.jpg,keris_parungsari_,0,0.4640,0.4950,0.4680,0.7820,keris_luk_13,Parungsari,,,13,yes
+0196_Keris_Parungsari_Sinebaning_Dilah_0_b1e79f.jpg,keris_parungsari_,1,0.6060,0.3970,0.2280,0.6300,keris_parungsari_,Parungsari,,,,no
+0196_Keris_Parungsari_Sinebaning_Dilah_0_b1e79f.jpg,keris_parungsari_,2,0.5815,0.5855,0.1210,0.6170,keris_parungsari_,Parungsari,,,,no
+0191_Keris_Parungsari_Cirebon_Sultan_Agung_0_339f8a.jpg,keris_parungsari_,0,0.4937,0.4839,0.4873,0.8877,keris_luk_13,Parungsari,,Cirebon,13,yes
+0195_Keris_Parungsari_Pamor_Wahyu_Tumurun_Amangkurat_0_0d7eb2.jpg,keris_parungsari_,0,0.6929,0.4878,0.1748,0.8740,keris_luk_13,Parungsari,Wahyu Tumurun,,13,yes
+0144_Keris_Mundarang_Pamor_Bonang_Rinenteng_0_228134.jpg,keris_mundarang_,0,0.6730,0.4780,0.2100,0.7820,keris_lurus,Mundarang,Bonang Rinenteng,,0,yes
+0203_Keris_Pasopati_Pamor_Wengkon_Besi_Hurap_0_45905a.jpg,keris_pasopati_,0,0.6216,0.5005,0.2021,0.8721,keris_lurus,Pasopati,Wengkon,,0,yes
+0202_Keris_Pasopati_Pamor_Sekar_Manggar_0_c8a45e.jpg,keris_pasopati_,0,0.6235,0.4883,0.1826,0.8086,keris_lurus,Pasopati,Manggar,,0,yes
+0204_Keris_Pasopati_Tangguh_Mangkubumen_0_0e39fc.jpg,keris_pasopati_,0,0.6196,0.5005,0.1826,0.7666,keris_lurus,Pasopati,,Mangkubumen,0,yes
+0201_Keris_Pasopati_Pamor_Pedaringan_Kebak_0_7751fe.jpg,keris_pasopati_,0,0.6392,0.5132,0.1963,0.8350,keris_lurus,Pasopati,Pedaringan Kebak,,0,yes
+0207_Keris_Pasupati_Tangguh_Mataram_Kartasura_0_d8098f.jpg,keris_unknown,0,0.5979,0.5135,0.1926,0.7918,keris_lurus,,,Mataram,0,yes
+0205_Keris_Pasupati_Kinatah_Emas_Panji_Wilis_0_49d825.jpg,keris_unknown,0,0.6516,0.5078,0.1539,0.8484,keris_lurus,,,,0,yes
+0141_Keris_Megantara_Kinatah_Emas_0_d2ea7b.jpg,keris_unknown,0,0.6336,0.5018,0.1869,0.8057,keris_luk_7,,,,7,yes
+0231_Keris_Santan_Pamor_Pandita_Bala_Pandita_0_552d36.jpg,keris_unknown,0,0.6046,0.4699,0.2348,0.7621,keris_unknown,,,,,no
+0231_Keris_Santan_Pamor_Pandita_Bala_Pandita_0_552d36.jpg,keris_unknown,1,0.3784,0.5154,0.2528,0.6727,keris_luk_11,,,,11,yes
+0186_Keris_Panji_Nom_Kinatah_Emas_Makoro_0_b619d7.jpg,keris_unknown,0,0.6450,0.4902,0.1924,0.8594,keris_lurus,,,,0,yes
+0185_Keris_Panji_Nom_Kinatah_Emas_Gonjo_Wilut_0_24d6b1.jpg,keris_unknown,0,0.6792,0.5186,0.1689,0.8496,keris_lurus,,,,0,yes
+0157_Keris_Nagasasra_Kinatah_Emas_Kamarogan_0_c84e3f.jpg,keris_unknown,0,0.4819,0.5020,0.4697,0.9316,keris_luk_11,,,,11,yes
+0208_Keris_Pasupati_Tangguh_PB_III_0_2e3ad1.jpg,keris_unknown,0,0.6627,0.4877,0.1504,0.8449,keris_lurus,,,,0,yes
+0146_Keris_Naga_Bongkokan_Kinatah_Emas_0_32ff6b.jpg,keris_unknown,0,0.4956,0.4824,0.5342,0.8613,keris_lurus,,,,0,yes
+0146_Keris_Naga_Bongkokan_Kinatah_Emas_0_32ff6b.jpg,keris_unknown,1,0.6963,0.5190,0.1660,0.8057,keris_unknown,,,,,no
+0181_Keris_Pandhawa_Prasaja_Pengawak_Waja_0_d2cf11.jpg,keris_unknown,0,0.4810,0.4951,0.4580,0.8340,keris_luk_7,,,,7,yes
+0181_Keris_Pandhawa_Prasaja_Pengawak_Waja_0_d2cf11.jpg,keris_unknown,1,0.6533,0.3838,0.2090,0.6895,keris_unknown,,,,,no
+0181_Keris_Pandhawa_Prasaja_Pengawak_Waja_0_d2cf11.jpg,keris_unknown,2,0.6162,0.8086,0.0977,0.2051,keris_unknown,,,,,no
+0029_Keris_Balebang_Pamor_Kulit_Semangka_Tangguh_Bali_S_0_dfa2a8.jpg,keris_unknown,0,0.5024,0.4858,0.9248,0.9717,keris_luk_7,,Kulit Semangka,Bali,7,yes
+0110_Keris_Kala_Nadhah_Corok_Kesultanan_Cirebon_0_486b1a.jpg,keris_unknown,0,0.6627,0.5029,0.1746,0.9059,keris_luk_5,,,Cirebon,5,yes
+0077_Keris_Dholog_Pedaringan_Kebak_0_4de7c3.jpg,keris_unknown,0,0.6445,0.4883,0.1895,0.8594,keris_luk_5,,Pedaringan Kebak,,5,yes
+0158_Keris_Nogo_Siluman_Kinatah_Emas_Madura_Sepuh_0_a8d25a.jpg,keris_unknown,0,0.4673,0.4893,0.5049,0.9004,keris_luk_13,,,Madura,13,yes
+0078_Keris_Dholog_Tangguh_Mataram_Senopaten_0_eac346.jpg,keris_unknown,0,0.6855,0.5171,0.1582,0.8115,keris_luk_5,,,Mataram Senopaten,5,yes
+0190_Keris_Panji_Penganten_Kinatah_Kalacakra_0_392846.jpg,keris_unknown,0,0.6645,0.5090,0.1810,0.8320,keris_lurus,,,,0,yes
+0148_Keris_Naga_Penganten_Kinatah_Emas_0_960c94.jpg,keris_unknown,0,0.6333,0.4629,0.1631,0.8145,keris_luk_9,,,,9,yes
+0084_Keris_Gumbeng_Tangguh_Tuban_Sepuh_0_af098c.jpg,keris_unknown,0,0.6509,0.4976,0.1904,0.8760,keris_lurus,,,Tuban,0,yes
+0028_Keris_Balebang_Pamor_Keleng_Asli_Bugis_0_41f189.jpg,keris_unknown,0,0.4559,0.4637,0.7326,0.9079,keris_luk_7,,Kelengan,Bugis,7,yes
+0243_Keris_Sempono_Pamor_Banyu_Mili_Sepuh_0_e62e23.jpg,keris_sempana_,0,0.6245,0.4883,0.1865,0.8711,keris_luk_7,Sempana,Banyu Mili,,7,yes
+0235_Keris_Sempana_Pamor_Junjung_Derajat_Pajajaran_0_8a5cf0.jpg,keris_sempana_,0,0.6680,0.5024,0.1836,0.8350,keris_luk_7,Sempana,Junjung Derajat,Pajajaran,7,yes
+0233_Keris_Sempana_Pajajaran_Sepuh_0_5d6618.jpg,keris_sempana_,0,0.6631,0.4980,0.1582,0.9121,keris_luk_7,Sempana,,Pajajaran,7,yes
+0234_Keris_Sempana_Pamor_Adeg_Singkir_0_9e96c0.jpg,keris_sempana_,0,0.6297,0.4080,0.1453,0.6730,keris_luk_7,Sempana,Adeg,,7,yes
+0221_Keris_Putut_Tangguh_Tuban_Sepuh_0_500ece.jpg,keris_putut_,0,0.6455,0.4922,0.2031,0.8730,keris_lurus,Putut,,Tuban,0,yes
+0275_Keris_Sinom_Robyong_Pamor_Tumpal_Keli_0_4500ed.jpg,keris_sinom_,0,0.6675,0.4253,0.1377,0.6748,keris_lurus,Sinom,,,0,yes
+0272_Keris_Sinom_Pamor_Wengkon_0_b567d3.jpg,keris_sinom_,0,0.6662,0.4986,0.1957,0.8652,keris_lurus,Sinom,Wengkon,,0,yes
+0274_Keris_Sinom_Robyong_Kinatah_Emas_0_f7443e.jpg,keris_sinom_,0,0.4380,0.5293,0.4561,0.8340,keris_lurus,Sinom,,,0,yes
+0274_Keris_Sinom_Robyong_Kinatah_Emas_0_f7443e.jpg,keris_sinom_,1,0.6499,0.4985,0.1748,0.9092,keris_sinom_,Sinom,,,,no
+0160_Keris_Paksi_Naga_Liman_Kinatah_Emas_0_129815.jpg,keris_naga_liman_,0,0.6555,0.4645,0.1750,0.8310,keris_luk_5,Naga Liman,,,5,yes
+0147_Keris_Naga_Liman_Kinatah_Emas_0_44485b.jpg,keris_naga_liman_,0,0.6570,0.4915,0.1720,0.7770,keris_luk_7,Naga Liman,,,7,yes
+0267_Keris_Singo_Barong_Mataram_Senopaten_0_e4d601.jpg,keris_singo_barong_,0,0.6905,0.3855,0.1390,0.5510,keris_luk_5,Singo Barong,,Mataram Senopaten,5,yes
+0268_Keris_Singo_Barong_Pamor_Pedaringan_Kebak_0_6cc6c0.jpg,keris_singo_barong_,0,0.6519,0.5054,0.1299,0.6885,keris_luk_9,Singo Barong,Pedaringan Kebak,,9,yes
