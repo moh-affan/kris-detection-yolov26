@@ -213,8 +213,16 @@ def load_sam_model():
         return _sam_model_instance, _SAM_MODEL_PATH
 
     if not os.path.exists(_SAM_MODEL_PATH):
-        print(f"[detector] SAM model tidak ditemukan: {_SAM_MODEL_PATH}")
-        return None, None
+        print(f"[detector] SAM model tidak ditemukan di {_SAM_MODEL_PATH}. Mencoba mengunduh otomatis...")
+        try:
+            import urllib.request
+            url = "https://github.com/ultralytics/assets/releases/download/v8.2.0/mobile_sam.pt"
+            os.makedirs(os.path.dirname(_SAM_MODEL_PATH), exist_ok=True)
+            urllib.request.urlretrieve(url, _SAM_MODEL_PATH)
+            print(f"[detector] SAM model berhasil diunduh ke {_SAM_MODEL_PATH}")
+        except Exception as e:
+            print(f"[detector] Gagal mengunduh SAM model secara otomatis: {e}")
+            return None, None
 
     try:
         import torch
